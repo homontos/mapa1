@@ -199,6 +199,38 @@
     }
 
     map.on("load", () => {
+            // Zgrubna mapa swiata pod spodem
+      map.addSource("swiat", {
+        type: "vector",
+        url: "https://demotiles.maplibre.org/tiles/tiles.json"
+      });
+      map.addLayer({
+        id: "swiat-ladowe", type: "fill", source: "swiat",
+        "source-layer": "countries",
+        paint: { "fill-color": "#e4e4e4" }
+      }, "ladowe");
+      map.addLayer({
+        id: "swiat-granice", type: "line", source: "swiat",
+        "source-layer": "countries",
+        paint: { "line-color": "#a0a0a0", "line-width": 0.8 }
+      }, "ladowe");
+
+      // Morze w rejonie dokladnego wybrzeza (zakrywa zgrubny lad)
+      map.addSource("morze-prostokat", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: [[[12.0, 52.5], [22.0, 52.5], [22.0, 56.5],
+                           [12.0, 56.5], [12.0, 52.5]]]
+          }
+        }
+      });
+      map.addLayer({
+        id: "morze-prostokat", type: "fill", source: "morze-prostokat",
+        paint: { "fill-color": "#c8c8c8" }
+      }, "ladowe");
       map.addImage("strzalka", narysujStrzalke(), { sdf: true });
       map.addSource("statki", { type: "geojson", data: dane });
 
