@@ -1,11 +1,16 @@
 import json
+import os
 import urllib.request
 
 from shapely.geometry import shape, box, mapping
 
 URL = ("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/"
        "master/geojson/ne_10m_admin_0_countries.geojson")
-OBSZAR = box(12.0, 52.5, 22.0, 56.5)  # zachod, poludnie, wschod, polnoc
+# zachod, poludnie, wschod, polnoc
+BBOX = [float(x) for x in
+        os.environ.get("BBOX", "12.0,52.5,22.0,56.5").split(",")]
+PLIK = os.environ.get("PLIK_WYJSCIOWY", "wybrzeze.geojson")
+OBSZAR = box(*BBOX)
 
 with urllib.request.urlopen(URL, timeout=180) as r:
     dane = json.load(r)
@@ -28,7 +33,7 @@ for ft in dane["features"]:
         "geometry": mapping(przyciete),
     })
 
-with open("wybrzeze.geojson", "w", encoding="utf-8") as f:
+with open(PLIK, "w", encoding="utf-8") as f:
     json.dump({"type": "FeatureCollection", "features": cechy}, f,
               ensure_ascii=False, separators=(",", ":"))
-print("Zapisano krajow:", len(cechy))
+print("Zapisano krajow:", len(cechy), "do", PLIK)
