@@ -8,9 +8,9 @@ import websockets
 
 KLUCZ = os.environ["AISSTREAM_API_KEY"]
 CZAS_NASLUCHU = 150         # ile sekund nasluchiwac
-PLIK = "statki.geojson"
+PLIK = os.environ.get("PLIK_WYJSCIOWY", "statki.geojson")
 # Polskie wybrzeze i Zatoka Gdanska: [[szer, dl], [szer, dl]]
-OBSZAR = [[[53.8, 14.0], [55.2, 20.0]]]
+OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.8, 14.0], [55.2, 20.0]]]"))
 MAX_WIEK = timedelta(hours=3)
 
 POZYCJE = ("PositionReport", "StandardClassBPositionReport",
