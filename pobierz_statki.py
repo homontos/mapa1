@@ -7,11 +7,15 @@ from datetime import datetime, timezone, timedelta
 import websockets
 
 KLUCZ = os.environ["AISSTREAM_API_KEY"]
-CZAS_NASLUCHU = 90          # ile sekund nasluchiwac
+CZAS_NASLUCHU = 150         # ile sekund nasluchiwac
 PLIK = "statki.geojson"
 # Polskie wybrzeze i Zatoka Gdanska: [[szer, dl], [szer, dl]]
 OBSZAR = [[[53.8, 14.0], [55.2, 20.0]]]
 MAX_WIEK = timedelta(hours=3)
+
+POZYCJE = ("PositionReport", "StandardClassBPositionReport",
+           "ExtendedClassBPositionReport")
+TYPY_KOMUNIKATOW = list(POZYCJE) + ["ShipStaticData", "StaticDataReport"]
 
 
 def opis_typu(kod):
@@ -47,7 +51,7 @@ async def nasluchuj(statki):
         await ws.send(json.dumps({
             "APIKey": KLUCZ,
             "BoundingBoxes": OBSZAR,
-            "FilterMessageTypes": ["PositionReport", "ShipStaticData"],
+            "FilterMessageTypes": TYPY_KOMUNIKATOW,
         }))
         koniec = time.time() + CZAS_NASLUCHU
         while time.time() < koniec:
@@ -61,25 +65,38 @@ async def nasluchuj(statki):
             mmsi = str(meta.get("MMSI", ""))
             if not mmsi:
                 continue
+            typ = msg.get("MessageType")
+            tresc = (msg.get("Message") or {}).get(typ) or {}
             s = statki.setdefault(mmsi, {"mmsi": mmsi})
             nazwa = (meta.get("ShipName") or "").strip()
             if nazwa:
                 s["nazwa"] = nazwa
-            typ = msg.get("MessageType")
-            if typ == "PositionReport":
-                p = msg["Message"]["PositionReport"]
-                s["lat"] = p.get("Latitude", meta.get("latitude"))
-                s["lon"] = p.get("Longitude", meta.get("longitude"))
-                s["predkosc"] = p.get("Sog")
-                s["kurs"] = p.get("Cog")
+
+            if typ in POZYCJE:
+                s["lat"] = tresc.get("Latitude", meta.get("latitude"))
+                s["lon"] = tresc.get("Longitude", meta.get("longitude"))
+                s["predkosc"] = tresc.get("Sog")
+                s["kurs"] = tresc.get("Cog")
                 s["aktualizacja"] = datetime.now(timezone.utc).isoformat(
                     timespec="seconds")
+                if typ == "ExtendedClassBPositionReport":
+                    opis = opis_typu(tresc.get("Type"))
+                    if opis:
+                        s["typ"] = opis
             elif typ == "ShipStaticData":
-                d = msg["Message"]["ShipStaticData"]
-                cel = (d.get("Destination") or "").strip()
+                cel = (tresc.get("Destination") or "").strip()
                 if cel:
                     s["cel"] = cel
-                opis = opis_typu(d.get("Type"))
+                opis = opis_typu(tresc.get("Type"))
+                if opis:
+                    s["typ"] = opis
+            elif typ == "StaticDataReport":
+                a = tresc.get("ReportA") or {}
+                b = tresc.get("ReportB") or {}
+                nazwa_a = (a.get("Name") or "").strip()
+                if nazwa_a and "nazwa" not in s:
+                    s["nazwa"] = nazwa_a
+                opis = opis_typu(b.get("ShipType"))
                 if opis:
                     s["typ"] = opis
 
