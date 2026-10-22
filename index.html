@@ -8,32 +8,70 @@
   <style>
     html, body { margin: 0; height: 100%; font-family: sans-serif; }
     #map { position: fixed; inset: 0; }
+    .panel {
+      position: absolute; z-index: 2; background: rgba(255,255,255,0.95);
+      border-radius: 8px; padding: 8px 10px; font-size: 13px; color: #222;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    #szukaj-panel { top: 10px; left: 10px; right: 60px; max-width: 320px; }
+    #szukaj { width: 100%; box-sizing: border-box; font-size: 16px; padding: 6px; }
+    #wynik { margin-top: 4px; color: #555; min-height: 1em; }
+    #legenda { left: 10px; bottom: 28px; }
+    .leg { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    .kropka { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
     .popup-tytul { font-weight: bold; margin-bottom: 4px; }
     .popup-wiersz { font-size: 13px; }
   </style>
 </head>
 <body>
   <div id="map"></div>
+
+  <div id="szukaj-panel" class="panel">
+    <input id="szukaj" type="search" placeholder="Szukaj: nazwa lub MMSI">
+    <div id="wynik"></div>
+  </div>
+  <div id="legenda" class="panel"></div>
+
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script>
+    // Kolory wedlug typu (nazwy musza zgadzac sie ze skryptem pobierz_statki.py)
+    const KOLORY = [
+      ["Zbiornikowiec", "#e03131"],
+      ["Towarowy", "#1c7ed6"],
+      ["Pasazerski", "#2f9e44"],
+      ["Rybacki", "#f08c00"],
+      ["Holownik", "#7048e8"],
+      ["Zaglowka", "#0ca678"],
+      ["Jacht", "#0ca678"],
+      ["Wojskowy", "#495057"]
+    ];
+    const KOLOR_INNY = "#868e96";
+    const LEGENDA = [
+      ["Zbiornikowiec", "#e03131"], ["Towarowy", "#1c7ed6"],
+      ["Pasażerski", "#2f9e44"], ["Rybacki", "#f08c00"],
+      ["Holownik", "#7048e8"], ["Żaglówka / jacht", "#0ca678"],
+      ["Wojskowy", "#495057"], ["Inny / brak danych", KOLOR_INNY]
+    ];
+
+    const wyrazenieKoloru = ["match", ["coalesce", ["get", "typ"], ""]];
+    KOLORY.forEach(([typ, kolor]) => wyrazenieKoloru.push(typ, kolor));
+    wyrazenieKoloru.push(KOLOR_INNY);
+
+    const predkosc = ["coalesce", ["get", "predkosc"], 0];
+
     const map = new maplibregl.Map({
       container: "map",
       style: {
         version: 8,
         sources: {
-          kraje: {
-            type: "vector",
-            url: "https://demotiles.maplibre.org/tiles/tiles.json"
-          }
+          ladowe: { type: "geojson", data: "wybrzeze.geojson" }
         },
         layers: [
           { id: "tlo", type: "background",
             paint: { "background-color": "#c8c8c8" } },
-          { id: "ladowe", type: "fill", source: "kraje",
-            "source-layer": "countries",
+          { id: "ladowe", type: "fill", source: "ladowe",
             paint: { "fill-color": "#e4e4e4" } },
-          { id: "granice", type: "line", source: "kraje",
-            "source-layer": "countries",
+          { id: "granice", type: "line", source: "ladowe",
             paint: { "line-color": "#a0a0a0", "line-width": 0.8 } }
         ]
       },
@@ -42,7 +80,21 @@
     });
     map.addControl(new maplibregl.NavigationControl());
 
-    const adresDanych = () => "statki.geojson?t=" + Date.now();
+    // Strzalka (biala, kolorowana w warstwie)
+    function narysujStrzalke() {
+      const r = 64;
+      const c = document.createElement("canvas");
+      c.width = r; c.height = r;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(32, 4); ctx.lineTo(54, 58);
+      ctx.lineTo(32, 46); ctx.lineTo(10, 58);
+      ctx.closePath(); ctx.fill();
+      return ctx.getImageData(0, 0, r, r);
+    }
+
+    let dane = { type: "FeatureCollection", features: [] };
 
     function wiersz(etykieta, wartosc) {
       if (wartosc === undefined || wartosc === null || wartosc === "") return null;
@@ -52,53 +104,122 @@
       return div;
     }
 
-    map.on("load", () => {
-      map.addSource("statki", { type: "geojson", data: adresDanych() });
+    function pokazPopup(p, pozycja) {
+      const box = document.createElement("div");
+      const tytul = document.createElement("div");
+      tytul.className = "popup-tytul";
+      tytul.textContent = p.nazwa || "Statek bez nazwy";
+      box.appendChild(tytul);
+      const czas = p.aktualizacja
+        ? new Date(p.aktualizacja).toLocaleString("pl-PL") : null;
+      [
+        wiersz("MMSI", p.mmsi),
+        wiersz("Typ", p.typ),
+        wiersz("Prędkość", p.predkosc != null ? p.predkosc + " węzłów" : null),
+        wiersz("Kurs", p.kurs != null ? p.kurs + "°" : null),
+        wiersz("Cel rejsu", p.cel),
+        wiersz("Ostatni sygnał", czas)
+      ].forEach((w) => { if (w) box.appendChild(w); });
+      new maplibregl.Popup().setLngLat(pozycja).setDOMContent(box).addTo(map);
+    }
 
+    async function odswiez() {
+      try {
+        const r = await fetch("statki.geojson?t=" + Date.now());
+        dane = await r.json();
+        map.getSource("statki").setData(dane);
+      } catch (e) {
+        console.log("Nie udalo sie wczytac statkow", e);
+      }
+    }
+
+    map.on("load", () => {
+      map.addImage("strzalka", narysujStrzalke(), { sdf: true });
+      map.addSource("statki", { type: "geojson", data: dane });
+
+      // Statki stojace (predkosc ok. 0): kropki
       map.addLayer({
-        id: "statki",
+        id: "statki-postoj",
         type: "circle",
         source: "statki",
+        filter: ["any", ["<=", predkosc, 0.5], [">=", predkosc, 100]],
         paint: {
           "circle-radius": 6,
-          "circle-color": "#1c7ed6",
+          "circle-color": wyrazenieKoloru,
           "circle-stroke-width": 1.5,
           "circle-stroke-color": "#ffffff"
         }
       });
 
-      map.on("click", "statki", (e) => {
-        const p = e.features[0].properties;
-        const box = document.createElement("div");
-
-        const tytul = document.createElement("div");
-        tytul.className = "popup-tytul";
-        tytul.textContent = p.nazwa || "Statek bez nazwy";
-        box.appendChild(tytul);
-
-        const czas = p.aktualizacja
-          ? new Date(p.aktualizacja).toLocaleString("pl-PL") : null;
-        [
-          wiersz("MMSI", p.mmsi),
-          wiersz("Typ", p.typ),
-          wiersz("Prędkość", p.predkosc != null ? p.predkosc + " węzłów" : null),
-          wiersz("Kurs", p.kurs != null ? p.kurs + "°" : null),
-          wiersz("Cel rejsu", p.cel),
-          wiersz("Ostatni sygnał", czas)
-        ].forEach((w) => { if (w) box.appendChild(w); });
-
-        new maplibregl.Popup()
-          .setLngLat(e.lngLat)
-          .setDOMContent(box)
-          .addTo(map);
+      // Statki plynace: strzalki obrocone zgodnie z kursem
+      map.addLayer({
+        id: "statki-ruch",
+        type: "symbol",
+        source: "statki",
+        filter: ["all", [">", predkosc, 0.5], ["<", predkosc, 100]],
+        layout: {
+          "icon-image": "strzalka",
+          "icon-size": 0.4,
+          "icon-rotate": ["case",
+            ["<", ["coalesce", ["get", "kurs"], 360], 360],
+            ["get", "kurs"], 0],
+          "icon-rotation-alignment": "map",
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true
+        },
+        paint: {
+          "icon-color": wyrazenieKoloru,
+          "icon-halo-color": "#ffffff",
+          "icon-halo-width": 1
+        }
       });
 
-      map.on("mouseenter", "statki", () => map.getCanvas().style.cursor = "pointer");
-      map.on("mouseleave", "statki", () => map.getCanvas().style.cursor = "");
+      ["statki-postoj", "statki-ruch"].forEach((id) => {
+        map.on("click", id, (e) => {
+          pokazPopup(e.features[0].properties, e.lngLat);
+        });
+        map.on("mouseenter", id, () => map.getCanvas().style.cursor = "pointer");
+        map.on("mouseleave", id, () => map.getCanvas().style.cursor = "");
+      });
 
-      setInterval(() => {
-        map.getSource("statki").setData(adresDanych());
-      }, 120000);
+      odswiez();
+      setInterval(odswiez, 120000);
+    });
+
+    // Wyszukiwarka
+    const poleSzukaj = document.getElementById("szukaj");
+    const poleWynik = document.getElementById("wynik");
+    poleSzukaj.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const q = poleSzukaj.value.trim().toUpperCase();
+      if (!q) { poleWynik.textContent = ""; return; }
+      const znalezione = dane.features.filter((f) =>
+        String(f.properties.mmsi) === q ||
+        (f.properties.nazwa || "").toUpperCase().includes(q));
+      if (!znalezione.length) {
+        poleWynik.textContent = "Nie znaleziono";
+        return;
+      }
+      poleWynik.textContent = znalezione.length === 1
+        ? "Znaleziono 1 statek"
+        : "Znaleziono " + znalezione.length + " – pokazuję pierwszy";
+      const f = znalezione[0];
+      map.flyTo({ center: f.geometry.coordinates, zoom: Math.max(map.getZoom(), 10) });
+      pokazPopup(f.properties, f.geometry.coordinates);
+    });
+
+    // Legenda
+    const legenda = document.getElementById("legenda");
+    LEGENDA.forEach(([nazwa, kolor]) => {
+      const w = document.createElement("div");
+      w.className = "leg";
+      const k = document.createElement("span");
+      k.className = "kropka";
+      k.style.background = kolor;
+      const t = document.createElement("span");
+      t.textContent = nazwa;
+      w.appendChild(k); w.appendChild(t);
+      legenda.appendChild(w);
     });
   </script>
 </body>
