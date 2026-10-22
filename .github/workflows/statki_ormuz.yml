@@ -1,0 +1,33 @@
+name: Pobierz statki Ormuz
+
+on:
+  schedule:
+    - cron: "5-59/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dane-statki-ormuz
+  cancel-in-progress: false
+
+jobs:
+  pobierz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install websockets
+      - run: python pobierz_statki.py
+        env:
+          AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
+          PLIK_WYJSCIOWY: statki_ormuz.geojson
+          OBSZAR: '[[[24.0, 53.5], [27.8, 58.5]]]'
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add statki_ormuz.geojson
+          git diff --cached --quiet || (git commit -m "Statki Ormuz" && git pull --rebase && git push)
