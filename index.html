@@ -14,8 +14,14 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.3);
     }
     #szukaj-panel { top: 10px; left: 10px; right: 60px; max-width: 320px; }
+    .przyciski { display: flex; gap: 4px; margin-bottom: 6px; }
+    .przyciski button { flex: 1; font-size: 12px; padding: 6px 4px; }
     #szukaj { width: 100%; box-sizing: border-box; font-size: 16px; padding: 6px; }
     #wynik { margin-top: 4px; color: #555; min-height: 1em; }
+    #ostrzezenie {
+      margin-top: 6px; font-size: 11px; color: #862e0a;
+      background: #fff4e6; border-radius: 4px; padding: 4px 6px;
+    }
     #legenda { left: 10px; bottom: 28px; }
     #fale-panel { right: 10px; bottom: 28px; max-width: 170px; }
     .leg { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
@@ -23,6 +29,7 @@
     .zrodlo { font-size: 10px; color: #666; margin-top: 6px; }
     .zrodlo a { color: #1c7ed6; }
     #status-pogody { font-size: 11px; color: #c92a2a; }
+    #podpowiedz-pogody { display: none; font-size: 11px; color: #555; margin-top: 4px; }
     .popup-tytul { font-weight: bold; margin-bottom: 4px; }
     .popup-wiersz { font-size: 13px; }
     .znacznik {
@@ -37,12 +44,22 @@
   <div id="map"></div>
 
   <div id="szukaj-panel" class="panel">
+    <div class="przyciski">
+      <button id="btn-oba">Oba</button>
+      <button id="btn-gdansk">Zatoka Gdańska</button>
+      <button id="btn-ormuz">Cieśnina Ormuz</button>
+    </div>
     <input id="szukaj" type="search" placeholder="Szukaj: nazwa lub MMSI">
     <div id="wynik"></div>
+    <div id="ostrzezenie">
+      Uwaga: w rejonie Cieśniny Ormuz GPS jest silnie zakłócany, więc pozycje
+      statków mogą być fałszywe (np. statki „na lądzie" lub skupiska w dziwnych miejscach).
+    </div>
   </div>
   <div id="legenda" class="panel"></div>
   <div id="fale-panel" class="panel">
     <label><input type="checkbox" id="przelacznik" checked> Pogoda morska</label>
+    <div id="podpowiedz-pogody">Przybliż mapę, aby zobaczyć pogodę.</div>
     <div id="legenda-fal"></div>
     <div id="status-pogody"></div>
     <div class="zrodlo">
@@ -53,6 +70,63 @@
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script>
+    // ---------- USTAWIENIA OGOLNE ----------
+    // Pogoda (kolka z liczbami) pokazuje sie od tego przyblizenia.
+    // Wpisz 0, jesli ma byc widoczna zawsze (bedzie tloczno przy malym przyblizeniu).
+    const PROG_ZOOM_POGODY = 5;
+    // Poczatkowy widok obejmujacy oba regiony: [[zachod, poludnie], [wschod, polnoc]]
+    const GRANICE_OBA = [[10, 22], [62, 58]];
+
+    // ---------- REGIONY ----------
+    // punkty: [szerokosc, dlugosc, nazwa] - punkty na wodzie
+    // miasta: [szerokosc, dlugosc, nazwa, numer punktu morza do podania fal]
+    // maska: [zachod, poludnie, wschod, polnoc] - obszar dokladnego wybrzeza
+    const REGIONY = {
+      gdansk: {
+        srodek: [18.9, 54.5], zoom: 7,
+        plikStatki: "statki.geojson",
+        plikWybrzeze: "wybrzeze.geojson",
+        maska: [12.0, 52.5, 22.0, 56.5],
+        punkty: [
+          [54.58, 18.65, "Zatoka Gdańska przy Gdyni"],
+          [54.55, 19.20, "Zatoka Gdańska (wschód)"],
+          [54.85, 18.70, "Na północ od Półwyspu Helskiego"],
+          [55.00, 18.20, "Bałtyk, północ od Helu"],
+          [55.10, 19.50, "Bałtyk, północny wschód"],
+          [54.95, 17.45, "Na północ od Łeby"],
+          [54.85, 16.75, "Na północ od Ustki"],
+          [54.55, 15.60, "Na północ od Kołobrzegu"],
+          [54.30, 14.40, "Zatoka Pomorska"],
+          [55.00, 16.00, "Bałtyk, zachód"]
+        ],
+        miasta: [[54.5189, 18.5305, "Gdynia", 0]]
+      },
+      ormuz: {
+        srodek: [56.3, 26.0], zoom: 6.5,
+        plikStatki: "statki_ormuz.geojson",
+        plikWybrzeze: "wybrzeze_ormuz.geojson",
+        maska: [52.5, 23.5, 60.0, 28.5],
+        punkty: [
+          [26.55, 56.55, "Cieśnina Ormuz"],
+          [26.30, 55.80, "Zatoka Perska, zachód od cieśniny"],
+          [26.10, 54.20, "Zatoka Perska (środek)"],
+          [25.70, 55.30, "Zatoka Perska przy Dubaju"],
+          [25.50, 53.80, "Zatoka Perska (południe)"],
+          [26.50, 57.00, "Zatoka Omańska (północ)"],
+          [25.50, 57.00, "Zatoka Omańska (środek)"],
+          [25.20, 56.90, "Zatoka Omańska przy Fudżajrze"],
+          [24.60, 58.00, "Zatoka Omańska (południe)"],
+          [25.00, 58.50, "Zatoka Omańska (wschód)"]
+        ],
+        miasta: [
+          [27.18, 56.27, "Bandar Abbas", 0],
+          [25.12, 56.33, "Fudżajra", 7],
+          [26.18, 56.25, "Chasab", 0]
+        ]
+      }
+    };
+    const KLUCZE = Object.keys(REGIONY);
+
     // ---------- USTAWIENIA STATKOW ----------
     const KOLORY = [
       ["Zbiornikowiec", "#e03131"], ["Towarowy", "#1c7ed6"],
@@ -75,20 +149,6 @@
     // ---------- USTAWIENIA POGODY ----------
     const MARINE = "https://marine-api.open-meteo.com/v1/marine";
     const FORECAST = "https://api.open-meteo.com/v1/forecast";
-    const GDYNIA = [54.5189, 18.5305];
-    // [szerokosc, dlugosc, nazwa] - punkty na wodzie
-    const PUNKTY_MORZA = [
-      [54.58, 18.65, "Zatoka Gdańska przy Gdyni"],
-      [54.55, 19.20, "Zatoka Gdańska (wschód)"],
-      [54.85, 18.70, "Na północ od Półwyspu Helskiego"],
-      [55.00, 18.20, "Bałtyk, północ od Helu"],
-      [55.10, 19.50, "Bałtyk, północny wschód"],
-      [54.95, 17.45, "Na północ od Łeby"],
-      [54.85, 16.75, "Na północ od Ustki"],
-      [54.55, 15.60, "Na północ od Kołobrzegu"],
-      [54.30, 14.40, "Zatoka Pomorska"],
-      [55.00, 16.00, "Bałtyk, zachód"]
-    ];
     const SKALA_FAL = [
       [0.5, "#51cf66", "poniżej 0,5 m"],
       [1.0, "#fcc419", "0,5 – 1 m"],
@@ -96,7 +156,6 @@
       [2.5, "#f03e3e", "1,5 – 2,5 m"],
       [Infinity, "#862e9c", "powyżej 2,5 m"]
     ];
-
     function kolorFali(h) {
       if (h === null || h === undefined) return "#868e96";
       for (const [limit, kolor] of SKALA_FAL) if (h < limit) return kolor;
@@ -125,20 +184,25 @@
     }
 
     // ---------- MAPA ----------
+    const stylZrodla = {};
+    const stylWarstwy = [
+      { id: "tlo", type: "background", paint: { "background-color": "#c8c8c8" } }
+    ];
+    KLUCZE.forEach((k) => {
+      stylZrodla["ladowe-" + k] = { type: "geojson", data: REGIONY[k].plikWybrzeze };
+      stylWarstwy.push(
+        { id: "ladowe-" + k, type: "fill", source: "ladowe-" + k,
+          paint: { "fill-color": "#e4e4e4" } },
+        { id: "granice-" + k, type: "line", source: "ladowe-" + k,
+          paint: { "line-color": "#a0a0a0", "line-width": 0.8 } }
+      );
+    });
+
     const map = new maplibregl.Map({
       container: "map",
-      style: {
-        version: 8,
-        sources: { ladowe: { type: "geojson", data: "wybrzeze.geojson" } },
-        layers: [
-          { id: "tlo", type: "background", paint: { "background-color": "#c8c8c8" } },
-          { id: "ladowe", type: "fill", source: "ladowe", paint: { "fill-color": "#e4e4e4" } },
-          { id: "granice", type: "line", source: "ladowe",
-            paint: { "line-color": "#a0a0a0", "line-width": 0.8 } }
-        ]
-      },
-      center: [18.9, 54.5],
-      zoom: 7
+      style: { version: 8, sources: stylZrodla, layers: stylWarstwy },
+      bounds: GRANICE_OBA,
+      fitBoundsOptions: { padding: 10 }
     });
     map.addControl(new maplibregl.NavigationControl());
 
@@ -172,6 +236,14 @@
       return box;
     }
 
+    // ---------- PRZYCISKI WIDOKU ----------
+    document.getElementById("btn-oba").addEventListener("click", () =>
+      map.fitBounds(GRANICE_OBA, { padding: 10 }));
+    document.getElementById("btn-gdansk").addEventListener("click", () =>
+      map.flyTo({ center: REGIONY.gdansk.srodek, zoom: REGIONY.gdansk.zoom }));
+    document.getElementById("btn-ormuz").addEventListener("click", () =>
+      map.flyTo({ center: REGIONY.ormuz.srodek, zoom: REGIONY.ormuz.zoom }));
+
     // ---------- STATKI ----------
     let dane = { type: "FeatureCollection", features: [] };
 
@@ -189,17 +261,25 @@
     }
 
     async function odswiezStatki() {
-      try {
-        const r = await fetch("statki.geojson?t=" + Date.now());
-        dane = await r.json();
-        map.getSource("statki").setData(dane);
-      } catch (e) {
-        console.log("Nie udalo sie wczytac statkow", e);
-      }
+      const wyniki = await Promise.allSettled(KLUCZE.map(async (k) => {
+        const r = await fetch(REGIONY[k].plikStatki + "?t=" + Date.now());
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }));
+      const cechy = [];
+      wyniki.forEach((w) => {
+        if (w.status === "fulfilled" && w.value.features) {
+          w.value.features.forEach((f) => cechy.push(f));
+        }
+      });
+      dane = { type: "FeatureCollection", features: cechy };
+      map.getSource("statki").setData(dane);
     }
 
     map.on("load", () => {
-            // Zgrubna mapa swiata pod spodem
+      const pierwszaWarstwaLadu = "ladowe-" + KLUCZE[0];
+
+      // Zgrubna mapa swiata pod spodem
       map.addSource("swiat", {
         type: "vector",
         url: "https://demotiles.maplibre.org/tiles/tiles.json"
@@ -208,29 +288,32 @@
         id: "swiat-ladowe", type: "fill", source: "swiat",
         "source-layer": "countries",
         paint: { "fill-color": "#e4e4e4" }
-      }, "ladowe");
+      }, pierwszaWarstwaLadu);
       map.addLayer({
         id: "swiat-granice", type: "line", source: "swiat",
         "source-layer": "countries",
         paint: { "line-color": "#a0a0a0", "line-width": 0.8 }
-      }, "ladowe");
+      }, pierwszaWarstwaLadu);
 
-      // Morze w rejonie dokladnego wybrzeza (zakrywa zgrubny lad)
-      map.addSource("morze-prostokat", {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          geometry: {
-            type: "Polygon",
-            coordinates: [[[12.0, 52.5], [22.0, 52.5], [22.0, 56.5],
-                           [12.0, 56.5], [12.0, 52.5]]]
+      // Morze w rejonach dokladnego wybrzeza (zakrywa zgrubny lad)
+      KLUCZE.forEach((k) => {
+        const [w, s, e, n] = REGIONY[k].maska;
+        map.addSource("morze-" + k, {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            geometry: {
+              type: "Polygon",
+              coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]]
+            }
           }
-        }
+        });
+        map.addLayer({
+          id: "morze-" + k, type: "fill", source: "morze-" + k,
+          paint: { "fill-color": "#c8c8c8" }
+        }, pierwszaWarstwaLadu);
       });
-      map.addLayer({
-        id: "morze-prostokat", type: "fill", source: "morze-prostokat",
-        paint: { "fill-color": "#c8c8c8" }
-      }, "ladowe");
+
       map.addImage("strzalka", narysujStrzalke(), { sdf: true });
       map.addSource("statki", { type: "geojson", data: dane });
 
@@ -259,7 +342,7 @@
       });
 
       ["statki-postoj", "statki-ruch"].forEach((id) => {
-        map.on("click", id, (e) => pokazPopupStatku(e.features[0].properties, e.lngLat));
+        map.on("click", id, (ev) => pokazPopupStatku(ev.features[0].properties, ev.lngLat));
         map.on("mouseenter", id, () => map.getCanvas().style.cursor = "pointer");
         map.on("mouseleave", id, () => map.getCanvas().style.cursor = "");
       });
@@ -274,13 +357,18 @@
     let markeryPogody = [];
     const przelacznik = document.getElementById("przelacznik");
     const statusPogody = document.getElementById("status-pogody");
+    const podpowiedz = document.getElementById("podpowiedz-pogody");
 
     function ustawWidocznosc() {
+      const dosycBlisko = map.getZoom() >= PROG_ZOOM_POGODY;
+      const pokaz = przelacznik.checked && dosycBlisko;
+      podpowiedz.style.display = (przelacznik.checked && !dosycBlisko) ? "block" : "none";
       markeryPogody.forEach((m) => {
-        m.getElement().style.display = przelacznik.checked ? "" : "none";
+        m.getElement().style.display = pokaz ? "" : "none";
       });
     }
     przelacznik.addEventListener("change", ustawWidocznosc);
+    map.on("zoom", ustawWidocznosc);
 
     async function pobierz(url) {
       const r = await fetch(url);
@@ -288,14 +376,6 @@
       return r.json();
     }
     const jakoTablica = (x) => Array.isArray(x) ? x : [x];
-
-    function dodajZnacznik(lon, lat, element, popup) {
-      const m = new maplibregl.Marker({ element })
-        .setLngLat([lon, lat])
-        .setPopup(popup)
-        .addTo(map);
-      markeryPogody.push(m);
-    }
 
     function wierszeFal(f) {
       return [
@@ -312,55 +392,57 @@
       ];
     }
 
-    async function odswiezPogode() {
-      const lats = PUNKTY_MORZA.map((p) => p[0]).join(",");
-      const lons = PUNKTY_MORZA.map((p) => p[1]).join(",");
-      try {
-        const [mor, wiatr, gdynia] = await Promise.all([
-          pobierz(MARINE + "?latitude=" + lats + "&longitude=" + lons +
-            "&current=wave_height,wave_direction,wave_period"),
-          pobierz(FORECAST + "?latitude=" + lats + "&longitude=" + lons +
-            "&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn"),
-          pobierz(FORECAST + "?latitude=" + GDYNIA[0] + "&longitude=" + GDYNIA[1] +
-            "&current=temperature_2m,apparent_temperature,relative_humidity_2m," +
-            "precipitation,weather_code,cloud_cover,pressure_msl," +
-            "wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn")
-        ]);
-        const mt = jakoTablica(mor);
-        const wt = jakoTablica(wiatr);
+    // Zwraca liste znacznikow do dodania dla jednego regionu
+    async function pogodaRegionu(R) {
+      const P = R.punkty;
+      const M = R.miasta;
+      const lats = P.map((p) => p[0]).join(",");
+      const lons = P.map((p) => p[1]).join(",");
+      const mLats = M.map((m) => m[0]).join(",");
+      const mLons = M.map((m) => m[1]).join(",");
+      const [mor, wiatr, miasta] = await Promise.all([
+        pobierz(MARINE + "?latitude=" + lats + "&longitude=" + lons +
+          "&current=wave_height,wave_direction,wave_period"),
+        pobierz(FORECAST + "?latitude=" + lats + "&longitude=" + lons +
+          "&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn"),
+        pobierz(FORECAST + "?latitude=" + mLats + "&longitude=" + mLons +
+          "&current=temperature_2m,apparent_temperature,relative_humidity_2m," +
+          "precipitation,weather_code,cloud_cover,pressure_msl," +
+          "wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn")
+      ]);
+      const mt = jakoTablica(mor);
+      const wt = jakoTablica(wiatr);
+      const ct = jakoTablica(miasta);
+      const wynik = [];
 
-        markeryPogody.forEach((m) => m.remove());
-        markeryPogody = [];
+      P.forEach((p, i) => {
+        const f = (mt[i] && mt[i].current) || {};
+        const w = (wt[i] && wt[i].current) || {};
+        const el = document.createElement("div");
+        el.className = "znacznik";
+        el.style.width = "30px";
+        el.style.height = "30px";
+        el.style.borderRadius = "50%";
+        el.style.background = kolorFali(f.wave_height);
+        el.textContent = f.wave_height != null ? liczba(f.wave_height) : "–";
+        const popup = new maplibregl.Popup({ offset: 18, maxWidth: "260px" })
+          .setDOMContent(zbudujPopup(p[2], wierszeFal(f).concat(wierszeWiatru(w))));
+        wynik.push({ lon: p[1], lat: p[0], el, popup });
+      });
 
-        PUNKTY_MORZA.forEach((p, i) => {
-          const f = (mt[i] && mt[i].current) || {};
-          const w = (wt[i] && wt[i].current) || {};
-          const el = document.createElement("div");
-          el.className = "znacznik";
-          el.style.width = "30px";
-          el.style.height = "30px";
-          el.style.borderRadius = "50%";
-          el.style.background = kolorFali(f.wave_height);
-          el.textContent = f.wave_height != null ? liczba(f.wave_height) : "–";
-          const popup = new maplibregl.Popup({ offset: 18, maxWidth: "260px" })
-            .setDOMContent(zbudujPopup(p[2],
-              wierszeFal(f).concat(wierszeWiatru(w))));
-          dodajZnacznik(p[1], p[0], el, popup);
-        });
-
-        // Gdynia
-        const g = gdynia.current || {};
-        const fGdynia = (mt[0] && mt[0].current) || {};
-        const elG = document.createElement("div");
-        elG.className = "znacznik";
-        elG.style.background = "#1864ab";
-        elG.style.borderRadius = "12px";
-        elG.style.padding = "2px 8px";
-        elG.style.height = "24px";
-        elG.textContent = "Gdynia" + (g.temperature_2m != null
+      M.forEach((m, i) => {
+        const g = (ct[i] && ct[i].current) || {};
+        const fm = (mt[m[3]] && mt[m[3]].current) || {};
+        const el = document.createElement("div");
+        el.className = "znacznik";
+        el.style.background = "#1864ab";
+        el.style.borderRadius = "12px";
+        el.style.padding = "2px 8px";
+        el.style.height = "24px";
+        el.textContent = m[2] + (g.temperature_2m != null
           ? " " + Math.round(g.temperature_2m) + "°" : "");
-        const popupG = new maplibregl.Popup({ offset: 18, maxWidth: "260px" })
-          .setDOMContent(zbudujPopup("Gdynia – pogoda teraz", [
+        const popup = new maplibregl.Popup({ offset: 18, maxWidth: "260px" })
+          .setDOMContent(zbudujPopup(m[2] + " – pogoda teraz", [
             wiersz("Temperatura", g.temperature_2m != null ? liczba(g.temperature_2m) + " °C" : null),
             wiersz("Odczuwalna", g.apparent_temperature != null ? liczba(g.apparent_temperature) + " °C" : null),
             wiersz("Niebo", opisPogody(g.weather_code)),
@@ -368,17 +450,35 @@
             wiersz("Opad", g.precipitation != null ? liczba(g.precipitation) + " mm" : null),
             wiersz("Wilgotność", g.relative_humidity_2m != null ? Math.round(g.relative_humidity_2m) + "%" : null),
             wiersz("Ciśnienie", g.pressure_msl != null ? Math.round(g.pressure_msl) + " hPa" : null)
-          ].concat(wierszeWiatru(g))
-           .concat([wiersz("Fale w zatoce przy Gdyni",
-             fGdynia.wave_height != null ? liczba(fGdynia.wave_height) + " m" : null)])));
-        dodajZnacznik(GDYNIA[1], GDYNIA[0], elG, popupG);
+          ].concat(wierszeWiatru(g)).concat([
+            wiersz("Fale w pobliżu", fm.wave_height != null ? liczba(fm.wave_height) + " m" : null)
+          ])));
+        wynik.push({ lon: m[1], lat: m[0], el, popup });
+      });
 
-        ustawWidocznosc();
-        statusPogody.textContent = "";
-      } catch (e) {
-        console.log("Blad pogody", e);
-        statusPogody.textContent = "Nie udało się pobrać pogody.";
+      return wynik;
+    }
+
+    async function odswiezPogode() {
+      const wyniki = await Promise.allSettled(
+        KLUCZE.map((k) => pogodaRegionu(REGIONY[k])));
+      const nowe = [];
+      let bledy = 0;
+      wyniki.forEach((w) => {
+        if (w.status === "fulfilled") w.value.forEach((x) => nowe.push(x));
+        else { bledy++; console.log("Blad pogody", w.reason); }
+      });
+      if (nowe.length) {
+        markeryPogody.forEach((m) => m.remove());
+        markeryPogody = nowe.map((x) =>
+          new maplibregl.Marker({ element: x.el })
+            .setLngLat([x.lon, x.lat])
+            .setPopup(x.popup)
+            .addTo(map));
       }
+      statusPogody.textContent = bledy
+        ? "Nie udało się pobrać pogody dla części regionów." : "";
+      ustawWidocznosc();
     }
 
     // ---------- WYSZUKIWARKA ----------
