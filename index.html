@@ -16,7 +16,36 @@
   <script>
     const map = new maplibregl.Map({
       container: "map",
-      style: "https://tiles.openfreemap.org/styles/liberty",
+      style: {
+        version: 8,
+        sources: {
+          kraje: {
+            type: "vector",
+            url: "https://demotiles.maplibre.org/tiles/tiles.json"
+          }
+        },
+        layers: [
+          {
+            id: "tlo",
+            type: "background",
+            paint: { "background-color": "#c8c8c8" }
+          },
+          {
+            id: "ladowe",
+            type: "fill",
+            source: "kraje",
+            "source-layer": "countries",
+            paint: { "fill-color": "#e4e4e4" }
+          },
+          {
+            id: "granice",
+            type: "line",
+            source: "kraje",
+            "source-layer": "countries",
+            paint: { "line-color": "#a0a0a0", "line-width": 0.8 }
+          }
+        ]
+      },
       center: [19.1, 52.0],
       zoom: 5.5
     });
