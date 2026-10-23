@@ -1,1 +1,1 @@
-{"type": "FeatureCollection", "features": []}
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"mmsi": "232052052", "nazwa": "MCS ROSIE 2", "predkosc": 3.3, "kurs": 167.5, "aktualizacja": "2026-10-23T21:37:45+00:00"}, "geometry": {"type": "Point", "coordinates": [55.216316666666664, 25.188378333333333]}}]}
