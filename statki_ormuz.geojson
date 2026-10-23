@@ -1,1 +1,1 @@
-{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"mmsi": "636022907", "nazwa": "GMS APOLLO", "predkosc": 3.3, "kurs": 42.7, "aktualizacja": "2026-10-22T23:59:05+00:00"}, "geometry": {"type": "Point", "coordinates": [54.649615000000004, 25.228521666666666]}}, {"type": "Feature", "properties": {"mmsi": "352006371", "nazwa": "TEN MARS", "predkosc": 0, "kurs": 299.4, "aktualizacja": "2026-10-23T00:00:41+00:00"}, "geometry": {"type": "Point", "coordinates": [54.63196166666667, 25.091015000000002]}}]}
+{"type": "FeatureCollection", "features": []}
