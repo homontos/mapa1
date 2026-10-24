@@ -2,7 +2,7 @@ name: Pobierz statki Ormuz
 
 on:
   schedule:
-    - cron: "5-59/10 * * * *"
+    - cron: "7,37 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -20,12 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install websockets
-      - run: python pobierz_statki.py
-        env:
-          AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
-          PLIK_WYJSCIOWY: statki_ormuz.geojson
-          OBSZAR: '[[[24.0, 53.5], [27.8, 58.5]]]'
+      - run: python pobierz_ormuz.py
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
