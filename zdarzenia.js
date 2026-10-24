@@ -27,7 +27,7 @@
     var box = document.createElement("div");
     var info = document.createElement("div");
     info.textContent = (p.kategoria === "polska" ? "Polska" : "Ukraina") +
-      " · wzmianki w mediach (24 h): " + (p.ile || "?");
+      " · zdarzenia w mediach (48 h): " + (p.ile || "?");
     box.appendChild(info);
     var lista = [];
     try { lista = JSON.parse(p.linki || "[]"); } catch (x) {}
