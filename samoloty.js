@@ -151,4 +151,29 @@
         var z = map.getSource("samoloty");
         if (z) z.setData(dane);
         var godz = d.czas ? new Date(d.czas).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) : "?";
-        status.textContent = "Samolotów nad Polską: " + cechy.length + " (stan z " + godz +
+        status.textContent = "Samolotów nad Polską: " + cechy.length + " (stan z " + godz + ")";
+      })
+      .catch(function () { pobierz(i + 1); });
+  }
+  function odswiez() { if (!document.hidden) pobierz(0); }
+  odswiez();
+  setInterval(odswiez, 60000);
+
+  // Statki: link do zdjec i danych (zdjec nie pobieramy automatycznie)
+  var oryg = window.pokazPopupStatku;
+  if (typeof oryg === "function") {
+    window.pokazPopupStatku = function (p, poz) {
+      oryg(p, poz);
+      var tresci = document.querySelectorAll(".maplibregl-popup-content");
+      var el = tresci[tresci.length - 1];
+      if (el && p.mmsi) {
+        var a = document.createElement("a");
+        a.href = "https://www.marinetraffic.com/en/ais/details/ships/mmsi:" + encodeURIComponent(p.mmsi);
+        a.target = "_blank"; a.rel = "noopener";
+        a.textContent = "Zdjęcia i dane statku (MarineTraffic)";
+        a.style.cssText = "display:block;font-size:12px;margin-top:6px";
+        el.appendChild(a);
+      }
+    };
+  }
+})();
