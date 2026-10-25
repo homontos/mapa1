@@ -1,5 +1,5 @@
 (function () {
-  var SZARY = { kolor: "#8a8a8a", krycie: 0.6 };   // krycie 0 = bez szarosci, 1 = cala szara
+  var SZARY = { kolor: "#8a8a8a", krycie: 0.5 };   // krycie 0 = bez szarosci, 1 = cala szara
 
   var css =
     "#lewa{position:fixed;left:10px;bottom:28px;z-index:3;width:300px;" +
