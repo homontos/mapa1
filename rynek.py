@@ -1,6 +1,8 @@
 import csv
 import io
 import json
+import os
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
@@ -14,6 +16,21 @@ def pobierz(url, agent="mapa-statkow (prywatny projekt niekomercyjny)"):
         "User-Agent": agent, "Accept": "application/json,text/csv,*/*"})
     with urllib.request.urlopen(zad, timeout=30) as r:
         return r.read().decode("utf-8")
+
+
+def brent_eia():
+    klucz = os.environ.get("EIA_API_KEY", "").strip()
+    if not klucz:
+        raise RuntimeError("brak klucza EIA_API_KEY")
+    parametry = urllib.parse.urlencode([
+        ("api_key", klucz), ("frequency", "daily"), ("data[0]", "value"),
+        ("facets[series][]", "RBRTE"), ("sort[0][column]", "period"),
+        ("sort[0][direction]", "desc"), ("length", "40")])
+    d = json.loads(pobierz("https://api.eia.gov/v2/petroleum/pri/spt/data/?" + parametry))
+    wiersze = d["response"]["data"]
+    hist = [[w["period"], round(float(w["value"]), 2)]
+            for w in reversed(wiersze) if w.get("value") not in (None, "")][-30:]
+    return {"cena": hist[-1][1], "data": hist[-1][0], "godzina": "", "hist": hist}
 
 
 def brent_yahoo(host):
@@ -61,15 +78,16 @@ for kod in ("usd", "eur"):
         print("Blad kursu", kod, e)
 
 zrodla = (
+    ("EIA", brent_eia),
     ("Yahoo query1", lambda: brent_yahoo("query1.finance.yahoo.com")),
-    ("Yahoo query2", lambda: brent_yahoo("query2.finance.yahoo.com")),
     ("Stooq", brent_stooq),
 )
 bledy = []
 for nazwa, funkcja in zrodla:
     try:
         wynik["brent"] = funkcja()
-        print("Zrodlo ropy:", nazwa, "| cena:", wynik["brent"]["cena"])
+        print("Zrodlo ropy:", nazwa, "| cena:", wynik["brent"]["cena"],
+              "| data:", wynik["brent"]["data"])
         wynik.pop("ropa_blad", None)
         break
     except Exception as e:
