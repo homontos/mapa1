@@ -1,4 +1,6 @@
 (function () {
+  var SZARY = { kolor: "#8a8a8a", krycie: 0.4 };   // krycie 0 = bez szarosci, 1 = cala szara
+
   var css =
     "#lewa{position:fixed;left:10px;bottom:28px;z-index:3;width:300px;" +
     "max-width:calc(100vw - 70px);max-height:calc(100% - 40px);overflow-y:auto;" +
@@ -12,7 +14,10 @@
     ".p-tresc{margin-top:6px}" +
     ".p-zwiniety .p-tresc{display:none}" +
     "#rynek .w{display:flex;justify-content:space-between;margin:2px 0}" +
-    "#rynek .s{font-size:11px;color:#555;margin-top:6px}";
+    "#rynek .s{font-size:11px;color:#555;margin-top:6px}" +
+    "#wiad-lista{max-height:220px;overflow-y:auto}" +
+    "#wiad .l{margin:6px 0;padding-left:6px;font-size:12px;cursor:pointer}" +
+    "#wiad .g{color:#555;font-size:10px;margin-top:4px}";
   var st = document.createElement("style");
   st.textContent = css;
   document.head.appendChild(st);
@@ -63,19 +68,30 @@
     '<div class="w"><span>Iran (UTC+3:30)</span><b id="c-iran">–</b></div>';
   document.body.appendChild(rynek);
 
-  // Kolejnosc od dolu do gory: legenda, pogoda, rynek, widok i szukanie
+  // Ramka: wiadomosci
+  var wiad = document.createElement("div");
+  wiad.id = "wiad";
+  wiad.className = "panel";
+  wiad.innerHTML = '<div id="wiad-lista">Ładowanie…</div>' +
+    '<div class="g">Zdania tworzone automatycznie z danych GDELT, to nie jest ' +
+    'tłumaczenie doniesień. Godzina = czas publikacji w mediach. ' +
+    'Dotknij wiersza, aby przejść na mapie.</div>';
+  document.body.appendChild(wiad);
+
+  // Kolejnosc od dolu do gory. Wszystkie ramki startuja zwiniete.
   var panele = [
-    ["legenda", "Legenda statków", true],
+    ["legenda", "Legenda", true],
     ["fale-panel", "Pogoda morska", true],
-    ["rynek", "Kursy i czas", false],
-    ["szukaj-panel", "Widok i szukanie", false]
+    ["rynek", "Kursy i czas", true],
+    ["wiad", "Wiadomości (ostatnie godziny)", true],
+    ["szukaj-panel", "Widok i szukanie", true]
   ];
   panele.forEach(function (p) {
     var el = document.getElementById(p[0]);
     if (el) opakuj(el, p[1], p[2]);
   });
 
-  // Dla kolejnych etapow: ramka ze szczegolami (zdarzenia, samoloty)
+  // Ramka ze szczegolami (zdarzenia)
   window.pokazSzczegoly = function (tytul, wezel) {
     var el = document.getElementById("szczegoly");
     if (!el) {
@@ -127,4 +143,91 @@
   }
   kursy();
   setInterval(kursy, 10 * 60 * 1000);
+
+  // Wiadomosci
+  function wczytajWiad() {
+    var box = document.getElementById("wiad-lista");
+    fetch("wiadomosci.json?t=" + Date.now())
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        box.innerHTML = "";
+        (d.lista || []).forEach(function (x) {
+          var w = document.createElement("div");
+          w.className = "l";
+          w.style.borderLeft = "3px solid " + (x.kat === "polska" ? "#1971c2" : "#e03131");
+          var g = new Date(x.t).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+          w.appendChild(document.createTextNode(g + " · " + x.z + " "));
+          if (/^https?:\/\//.test(x.u || "")) {
+            var a = document.createElement("a");
+            a.href = x.u; a.target = "_blank"; a.rel = "noopener";
+            a.textContent = "↗";
+            a.addEventListener("click", function (e) { e.stopPropagation(); });
+            w.appendChild(a);
+          }
+          w.addEventListener("click", function () {
+            map.flyTo({ center: [x.lon, x.lat], zoom: Math.max(map.getZoom(), 8) });
+          });
+          box.appendChild(w);
+        });
+        if (!box.firstChild) box.textContent = "Brak zdarzeń z ostatnich godzin.";
+      })
+      .catch(function () { box.textContent = "Brak danych."; });
+  }
+  wczytajWiad();
+  setInterval(wczytajWiad, 10 * 60 * 1000);
+
+  // Lekko szara mapa szczegolowa (nakladka pod statkami i znacznikami)
+  function nalozSzary() {
+    if (typeof aktualnyPodklad === "undefined" || aktualnyPodklad !== "szczegolowa") return;
+    if (map.getLayer("szary-filtr")) return;
+    map.addLayer({
+      id: "szary-filtr", type: "background",
+      paint: { "background-color": SZARY.kolor, "background-opacity": SZARY.krycie }
+    }, map.getLayer("statki-postoj") ? "statki-postoj" : undefined);
+  }
+  map.on("style.load", nalozSzary);
+  if (map.isStyleLoaded()) nalozSzary();
+
+  // Zdjecie statku z Wikimedia Commons (jesli jest pod ta nazwa)
+  var orygStatek = window.pokazPopupStatku;
+  if (typeof orygStatek === "function") {
+    window.pokazPopupStatku = function (p, poz) {
+      orygStatek(p, poz);
+      var nazwa = (p.nazwa || "").trim();
+      if (nazwa.length < 4) return;
+      var tr = document.querySelectorAll(".maplibregl-popup-content");
+      var el = tr[tr.length - 1];
+      if (!el) return;
+      var adres = "https://commons.wikimedia.org/w/api.php?action=query&format=json" +
+        "&origin=*&generator=search&gsrnamespace=6&gsrlimit=6&prop=imageinfo" +
+        "&iiprop=url&iiurlwidth=300&gsrsearch=" + encodeURIComponent(nazwa + " ship");
+      fetch(adres)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var str = d.query && d.query.pages ? d.query.pages : {};
+          var n = nazwa.toLowerCase();
+          var trafione = Object.keys(str).map(function (k) { return str[k]; })
+            .filter(function (s) {
+              return s.title && s.title.toLowerCase().indexOf(n) !== -1 &&
+                s.imageinfo && s.imageinfo[0] && s.imageinfo[0].thumburl;
+            });
+          if (!trafione.length) return;
+          var ii = trafione[0].imageinfo[0];
+          if (ii.thumburl.indexOf("https://") !== 0) return;
+          var img = document.createElement("img");
+          img.src = ii.thumburl;
+          img.alt = "Zdjęcie statku";
+          img.style.cssText = "width:100%;border-radius:4px;margin-top:6px";
+          el.appendChild(img);
+          var a = document.createElement("a");
+          a.textContent = "Zdjęcie: Wikimedia Commons (może przedstawiać inny statek o tej nazwie)";
+          if ((ii.descriptionurl || "").indexOf("https://") === 0) {
+            a.href = ii.descriptionurl; a.target = "_blank"; a.rel = "noopener";
+          }
+          a.style.cssText = "display:block;font-size:11px;margin-top:2px";
+          el.appendChild(a);
+        })
+        .catch(function () {});
+    };
+  }
 })();
