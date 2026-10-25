@@ -17,6 +17,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: python rynek.py
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
