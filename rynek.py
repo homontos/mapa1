@@ -10,14 +10,15 @@ PRZEGLADARKA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
 
 
 def pobierz(url, agent="mapa-statkow (prywatny projekt niekomercyjny)"):
-    zad = urllib.request.Request(url, headers={"User-Agent": agent})
+    zad = urllib.request.Request(url, headers={
+        "User-Agent": agent, "Accept": "application/json,text/csv,*/*"})
     with urllib.request.urlopen(zad, timeout=30) as r:
         return r.read().decode("utf-8")
 
 
-def brent_yahoo():
+def brent_yahoo(host):
     d = json.loads(pobierz(
-        "https://query1.finance.yahoo.com/v8/finance/chart/BZ%3DF?range=1mo&interval=1d",
+        "https://" + host + "/v8/finance/chart/BZ%3DF?range=1mo&interval=1d",
         PRZEGLADARKA))
     w = d["chart"]["result"][0]
     hist = [[datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%d"), round(c, 2)]
@@ -59,15 +60,24 @@ for kod in ("usd", "eur"):
     except Exception as e:
         print("Blad kursu", kod, e)
 
-for nazwa, funkcja in (("Yahoo Finance", brent_yahoo), ("Stooq", brent_stooq)):
+zrodla = (
+    ("Yahoo query1", lambda: brent_yahoo("query1.finance.yahoo.com")),
+    ("Yahoo query2", lambda: brent_yahoo("query2.finance.yahoo.com")),
+    ("Stooq", brent_stooq),
+)
+bledy = []
+for nazwa, funkcja in zrodla:
     try:
         wynik["brent"] = funkcja()
         print("Zrodlo ropy:", nazwa, "| cena:", wynik["brent"]["cena"])
+        wynik.pop("ropa_blad", None)
         break
     except Exception as e:
-        print("Blad ropy -", nazwa + ":", e)
+        opis = nazwa + ": " + type(e).__name__ + " " + str(e)[:120]
+        print("Blad ropy -", opis)
+        bledy.append(opis)
 else:
-    print("Ropa: zadne zrodlo nie odpowiedzialo")
+    wynik["ropa_blad"] = bledy
 
 wynik["zaktualizowano"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 if not any(k in wynik for k in ("usd", "eur", "brent")):
