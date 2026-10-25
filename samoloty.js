@@ -1,5 +1,5 @@
 (function () {
-    var ADRESY = ["samoloty.json"];
+  var ADRESY = ["samoloty.json"];
   var POLSKA = [[14.12,53.93],[16.0,54.55],[17.5,54.9],[18.5,54.95],[19.6,54.55],
     [19.9,54.4],[20.4,54.38],[22.8,54.38],[23.5,54.2],[23.55,53.9],[23.95,52.75],
     [23.6,52.1],[23.55,51.55],[24.05,50.85],[23.5,50.4],[22.7,49.6],[22.85,49.05],
@@ -117,7 +117,7 @@
     '<div class="leg"><span class="kropka" style="background:#343a40"></span><span>Cywilne</span></div>' +
     '<div class="leg"><span class="kropka" style="background:#e8590c"></span><span>Wojskowe (wg bazy)</span></div>' +
     '<div id="sam-status" style="font-size:11px;color:#555"></div>' +
-    '<div style="font-size:10px;color:#666">Dane: adsb.lol / adsb.fi</div>';
+    '<div style="font-size:10px;color:#666">Dane: adsb.fi / adsb.lol</div>';
   tresc.appendChild(blok);
   var status = document.getElementById("sam-status");
   document.getElementById("sam-przel").addEventListener("change", function () {
@@ -128,8 +128,8 @@
   });
 
   function pobierz(i) {
-    if (i >= ADRESY.length) { status.textContent = "Samoloty: brak połączenia ze źródłem"; return; }
-    fetch(ADRESY[i])
+    if (i >= ADRESY.length) { status.textContent = "Samoloty: brak danych"; return; }
+    fetch(ADRESY[i] + "?t=" + Date.now())
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (d) {
         var lista = d.ac || d.aircraft || [];
@@ -150,29 +150,5 @@
         dane = { type: "FeatureCollection", features: cechy };
         var z = map.getSource("samoloty");
         if (z) z.setData(dane);
-        status.textContent = "Samolotów nad Polską: " + cechy.length;
-      })
-      .catch(function () { pobierz(i + 1); });
-  }
-  function odswiez() { if (!document.hidden) pobierz(0); }
-  odswiez();
-  setInterval(odswiez, 20000);
-
-  // Statki: link do zdjec i danych (zdjec nie pobieramy automatycznie)
-  var oryg = window.pokazPopupStatku;
-  if (typeof oryg === "function") {
-    window.pokazPopupStatku = function (p, poz) {
-      oryg(p, poz);
-      var tresci = document.querySelectorAll(".maplibregl-popup-content");
-      var el = tresci[tresci.length - 1];
-      if (el && p.mmsi) {
-        var a = document.createElement("a");
-        a.href = "https://www.marinetraffic.com/en/ais/details/ships/mmsi:" + encodeURIComponent(p.mmsi);
-        a.target = "_blank"; a.rel = "noopener";
-        a.textContent = "Zdjęcia i dane statku (MarineTraffic)";
-        a.style.cssText = "display:block;font-size:12px;margin-top:6px";
-        el.appendChild(a);
-      }
-    };
-  }
-})();
+        var godz = d.czas ? new Date(d.czas).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) : "?";
+        status.textContent = "Samolotów nad Polską: " + cechy.length + " (stan z " + godz +
