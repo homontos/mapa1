@@ -17,8 +17,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: python zdarzenia.py
+      - run: python wiadomosci.py
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
-                    git add zdarzenia.geojson zdarzenia_surowe.json
+          git add zdarzenia.geojson zdarzenia_surowe.json wiadomosci.json
           git diff --cached --quiet || (git commit -m "Zdarzenia" && git pull --rebase && git push)
