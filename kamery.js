@@ -84,4 +84,13 @@
     });
     new maplibregl.Marker({ element: el }).setLngLat([k.lon, k.lat]).addTo(map);
   });
+    var btn = document.createElement("button");
+  btn.textContent = "📷 Kamery Gdynia";
+  btn.style.cssText = "position:fixed;bottom:70px;right:10px;z-index:4;" +
+    "padding:8px 10px;border:0;border-radius:6px;background:#0b7285;color:#fff;" +
+    "font:13px sans-serif;box-shadow:0 1px 4px rgba(0,0,0,0.3)";
+  btn.addEventListener("click", function () {
+    map.flyTo({ center: [18.55, 54.505], zoom: 13 });
+  });
+  document.body.appendChild(btn);
 })();
