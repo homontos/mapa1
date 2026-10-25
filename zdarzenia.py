@@ -88,7 +88,7 @@ while slot <= teraz - timedelta(minutes=10) and proby < 40:
             przyklad_wypisany = True
         widziane.add(w[0])
         magazyn["zdarzenia"].append({
-            "id": w[0], "t": slot.isoformat(), "kat": kat, "rodzaj": rodzaj,
+            "id": w[0], "t": slot.isoformat(), "kat": kat, "rodzaj": rodzaj,"kod": w[27],
             "miejsce": w[-9], "lat": lat, "lon": lon, "m": wzmianki, "url": w[-1]})
     slot += timedelta(minutes=15)
 
