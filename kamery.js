@@ -53,7 +53,7 @@
       var f = document.createElement("iframe");
       f.src = k.embed;
       f.allow = "autoplay; fullscreen";
-      f.setAttribute("sandbox", "allow-scripts allow-same-origin allow-popups");
+      f.setAttribute("sandbox", "allow-scripts allow-same-origin ");
       panel.appendChild(f);
     }
     var a = document.createElement("a");
