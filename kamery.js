@@ -3,7 +3,7 @@
     { nazwa: "Skwer Kościuszki / Dar Pomorza", lat: 54.5188, lon: 18.5532,
       link: "https://www.windy.com/webcams/1384053611", embed: "" },
     { nazwa: "Bulwar Nadmorski", lat: 54.5060, lon: 18.5580,
-      link: "https://www.windfinder.com/webcams/gdynia-kosakowo-airport", embed: "https://imageserver.webcamera.pl/umiesc/gdynia" },
+      link: "https://imageserver.webcamera.pl/umiesc/gdynia", embed: "https://imageserver.webcamera.pl/umiesc/gdynia" },
     { nazwa: "Molo w Orłowie", lat: 54.4770, lon: 18.5770,
       link: "https://www.windfinder.com/webcams/gdynia-kosakowo-airport", embed: "" }
   ];
