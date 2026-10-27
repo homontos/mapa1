@@ -4,7 +4,7 @@
     lat: 54.5189, lon: 18.5305,
     link: "https://www.youtube.com/live/uxC7Gf0_MwM",
     embed: "https://www.youtube.com/live/uxC7Gf0_MwM"
-  };
+  }; 
   var PROG_ZOOM = 5;        // tak samo jak pogoda
   var PRZESUNIECIE_X = 60;  // ile pikseli na prawo od etykiety "Gdynia"
 
