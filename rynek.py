@@ -1,5 +1,3 @@
-import csv
-import io
 import json
 import os
 import urllib.parse
@@ -7,13 +5,13 @@ import urllib.request
 from datetime import datetime, timezone
 
 PLIK = "rynek.json"
-PRZEGLADARKA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
 
 
-def pobierz(url, agent="mapa-statkow (prywatny projekt niekomercyjny)"):
-    zad = urllib.request.Request(url, headers={
-        "User-Agent": agent, "Accept": "application/json,text/csv,*/*"})
+def pobierz(url, naglowki=None):
+    h = {"User-Agent": "mapa-statkow (prywatny projekt niekomercyjny)",
+         "Accept": "application/json"}
+    h.update(naglowki or {})
+    zad = urllib.request.Request(url, headers=h)
     with urllib.request.urlopen(zad, timeout=30) as r:
         return r.read().decode("utf-8")
 
@@ -27,37 +25,65 @@ def brent_eia():
         ("facets[series][]", "RBRTE"), ("sort[0][column]", "period"),
         ("sort[0][direction]", "desc"), ("length", "40")])
     d = json.loads(pobierz("https://api.eia.gov/v2/petroleum/pri/spt/data/?" + parametry))
-    wiersze = d["response"]["data"]
     hist = [[w["period"], round(float(w["value"]), 2)]
-            for w in reversed(wiersze) if w.get("value") not in (None, "")][-30:]
-    return {"cena": hist[-1][1], "data": hist[-1][0], "godzina": "", "hist": hist}
+            for w in reversed(d["response"]["data"])
+            if w.get("value") not in (None, "")][-30:]
+    return {"cena": hist[-1][1], "data": hist[-1][0], "hist": hist}
 
 
-def brent_yahoo(host):
-    d = json.loads(pobierz(
-        "https://" + host + "/v8/finance/chart/BZ%3DF?range=1mo&interval=1d",
-        PRZEGLADARKA))
-    w = d["chart"]["result"][0]
-    hist = [[datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%d"), round(c, 2)]
-            for t, c in zip(w["timestamp"], w["indicators"]["quote"][0]["close"])
-            if c is not None][-30:]
-    cena = w["meta"].get("regularMarketPrice") or hist[-1][1]
-    return {"cena": float(cena), "data": hist[-1][0], "godzina": "", "hist": hist}
+def brent_ninjas():
+    klucz = os.environ.get("API_NINJAS_KEY", "").strip()
+    if not klucz:
+        raise RuntimeError("brak klucza API_NINJAS_KEY")
+    d = json.loads(pobierz("https://api.api-ninjas.com/v1/oilprice?type=brent",
+                           {"X-Api-Key": klucz}))
+    if isinstance(d, list):
+        d = d[0]
+    print("API Ninjas odpowiedz:", json.dumps(d)[:300])
+    cena = None
+    for pole in ("price", "value", "close"):
+        if d.get(pole) is not None:
+            cena = float(d[pole])
+            break
+    if cena is None:
+        raise ValueError("brak pola z cena w odpowiedzi")
+    data = datetime.fromtimestamp(d["updated"], timezone.utc).strftime("%Y-%m-%d")
+    return {"cena": round(cena, 2), "data": data}
 
 
-def brent_stooq():
-    wiersze = pobierz("https://stooq.com/q/l/?s=cb.f&f=sd2t2c&h&e=csv").strip().splitlines()
-    pola = wiersze[1].split(",")
-    brent = {"cena": float(pola[3]), "data": pola[1], "godzina": pola[2]}
-    hist = None
-    try:
-        tekst = pobierz("https://stooq.com/q/d/l/?s=cb.f&i=d")
-        hist = [[w["Date"], float(w["Close"])]
-                for w in list(csv.DictReader(io.StringIO(tekst)))[-30:] if w.get("Close")]
-    except Exception as e:
-        print("Brak historii ropy ze Stooq:", e)
-    brent["hist"] = hist or [[brent["data"], brent["cena"]]]
-    return brent
+def brent():
+    eia, nin, bledy = None, None, []
+    for nazwa, funkcja in (("EIA", brent_eia), ("API Ninjas", brent_ninjas)):
+        try:
+            wynik_zrodla = funkcja()
+            print("Zrodlo ropy:", nazwa, "| cena:", wynik_zrodla["cena"],
+                  "| data:", wynik_zrodla["data"])
+            if nazwa == "EIA":
+                eia = wynik_zrodla
+            else:
+                nin = wynik_zrodla
+        except Exception as e:
+            opis = nazwa + ": " + type(e).__name__ + " " + str(e)[:120]
+            print("Blad ropy -", opis)
+            bledy.append(opis)
+    if not eia and not nin:
+        raise RuntimeError(" | ".join(bledy))
+    if eia:
+        hist = eia["hist"]
+        wynik_b = {"cena": eia["cena"], "data": eia["data"], "hist": hist}
+        zrodlo = "EIA"
+    else:
+        hist = []
+        wynik_b = {"cena": nin["cena"], "data": nin["data"]}
+        zrodlo = "API Ninjas"
+    if nin and (not eia or nin["data"] > eia["data"]):
+        hist = [h for h in hist if h[0] != nin["data"]] + [[nin["data"], nin["cena"]]]
+        wynik_b = {"cena": nin["cena"], "data": nin["data"]}
+        zrodlo = "API Ninjas"
+    wynik_b["hist"] = hist[-30:]
+    wynik_b["godzina"] = ""
+    wynik_b["data"] = wynik_b["data"] + " (źródło: " + zrodlo + ")"
+    return wynik_b
 
 
 try:
@@ -77,25 +103,12 @@ for kod in ("usd", "eur"):
     except Exception as e:
         print("Blad kursu", kod, e)
 
-zrodla = (
-    ("EIA", brent_eia),
-    ("Yahoo query1", lambda: brent_yahoo("query1.finance.yahoo.com")),
-    ("Stooq", brent_stooq),
-)
-bledy = []
-for nazwa, funkcja in zrodla:
-    try:
-        wynik["brent"] = funkcja()
-        print("Zrodlo ropy:", nazwa, "| cena:", wynik["brent"]["cena"],
-              "| data:", wynik["brent"]["data"])
-        wynik.pop("ropa_blad", None)
-        break
-    except Exception as e:
-        opis = nazwa + ": " + type(e).__name__ + " " + str(e)[:120]
-        print("Blad ropy -", opis)
-        bledy.append(opis)
-else:
-    wynik["ropa_blad"] = bledy
+try:
+    wynik["brent"] = brent()
+    wynik.pop("ropa_blad", None)
+except Exception as e:
+    wynik["ropa_blad"] = [str(e)[:300]]
+    print("Ropa: brak danych:", e)
 
 wynik["zaktualizowano"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 if not any(k in wynik for k in ("usd", "eur", "brent")):
