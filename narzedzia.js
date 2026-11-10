@@ -252,4 +252,53 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
   }
 
-  tr.querySelector("#nar-zrzut").addEventListe
+  tr.querySelector("#nar-zrzut").addEventListener("click", function () {
+    zatwierdz();
+    podp.textContent = "Robię zrzut…";
+    map.once("render", function () {
+      var c = map.getCanvas();
+      var out = document.createElement("canvas");
+      out.width = c.width; out.height = c.height;
+      var x = out.getContext("2d");
+      x.fillStyle = "#ffffff";
+      x.fillRect(0, 0, out.width, out.height);
+      x.drawImage(c, 0, 0);
+      var ratio = c.width / c.clientWidth;
+      x.font = "bold " + Math.round(13 * ratio) + "px sans-serif";
+      x.textBaseline = "middle";
+      wpisy.forEach(function (w) {
+        var e = w.etykieta;
+        if (!e) return;
+        var p = map.project([e.lng, e.lat]);
+        var px = p.x * ratio, py = p.y * ratio;
+        var sz = x.measureText(e.tekst).width + 10 * ratio, h = 20 * ratio;
+        x.fillStyle = "rgba(255,255,255,0.92)";
+        x.fillRect(px - sz / 2, py - h / 2, sz, h);
+        x.lineWidth = 2 * ratio; x.strokeStyle = e.kolor;
+        x.strokeRect(px - sz / 2, py - h / 2, sz, h);
+        x.fillStyle = "#111"; x.textAlign = "center";
+        x.fillText(e.tekst, px, py);
+      });
+      var stopka = "Zrzut mapy · " + new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
+      var hs = 22 * ratio;
+      x.fillStyle = "rgba(0,0,0,0.65)";
+      x.fillRect(0, out.height - hs, out.width, hs);
+      x.fillStyle = "#fff"; x.textAlign = "left";
+      x.fillText(stopka, 8 * ratio, out.height - hs / 2);
+      out.toBlob(function (blob) {
+        if (!blob) { podp.textContent = "Nie udało się zrobić zrzutu."; return; }
+        var nazwa = "mapa_" + new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-") + ".jpg";
+        var plik = new File([blob], nazwa, { type: "image/jpeg" });
+        podp.textContent = "Zrzut gotowy.";
+        if (navigator.canShare && navigator.canShare({ files: [plik] })) {
+          navigator.share({ files: [plik], title: "Zrzut mapy" }).catch(function (err) {
+            if (err && err.name !== "AbortError") pobierz(blob, nazwa);
+          });
+        } else {
+          pobierz(blob, nazwa);
+        }
+      }, "image/jpeg", 0.92);
+    });
+    map.triggerRepaint();
+  });
+})();
