@@ -1,0 +1,31 @@
+name: Pobierz linie frontu
+
+on:
+  schedule:
+    - cron: "30 5,17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  front:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install shapely
+      - run: python front.py
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add front.geojson
+          if ! git diff --cached --quiet; then
+            git commit -m "Linia frontu"
+            for i in 1 2 3 4; do
+              git pull --rebase && git push && break
+              sleep $((i * 5))
+            done
+          fi
