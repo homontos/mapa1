@@ -1,14 +1,15 @@
 (function () {
-  var tryb = null, biezace = [], kolor = "#e03131";
+  var tryb = null, biezace = [], kolor = "#e03131", licznik = 0;
   var rysunki = { type: "FeatureCollection", features: [] };
   var podglad = { type: "FeatureCollection", features: [] };
-  var etykiety = [], historia = [];
+  var wpisy = [];
 
   var st = document.createElement("style");
   st.textContent =
     "body.narzedzie .maplibregl-popup,body.narzedzie #szczegoly{display:none!important}" +
     "#narzedzia button{padding:8px 4px;font-size:13px}" +
     "#narzedzia .siatka{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px}" +
+    "#narzedzia .szeroki{grid-column:span 2}" +
     "#narzedzia button.akt{background:#d0ebff;border:1px solid #1c7ed6;font-weight:bold}" +
     ".nar-kolor{width:26px;height:26px;border-radius:50%;border:2px solid #fff;" +
     "box-shadow:0 0 0 1px #999;padding:0!important}" +
@@ -31,8 +32,9 @@
     '<div class="siatka">' +
     '<button data-t="miarka">📏 Miarka</button><button data-t="linia">✏️ Linia</button>' +
     '<button data-t="obszar">⬠ Obszar</button><button data-t="tekst">🔤 Tekst</button>' +
+    '<button data-t="gumka" class="szeroki">🧽 Gumka (dotknij, aby usunąć)</button>' +
     '<button id="nar-koniec">✔ Zakończ rysunek</button><button id="nar-cofnij">↩ Cofnij</button>' +
-    '<button id="nar-wyczysc">🗑 Wyczyść</button><button id="nar-zrzut">📷 Zrzut JPEG</button></div>' +
+    '<button id="nar-wyczysc">🗑 Wyczyść wszystko</button><button id="nar-zrzut">📷 Zrzut JPEG</button></div>' +
     '<div id="nar-kolory" style="display:flex;gap:8px;margin:6px 0"></div>' +
     '<div id="nar-podp" style="font-size:12px;color:#444">Wybierz narzędzie.</div>';
   panel.appendChild(nag);
@@ -52,6 +54,7 @@
       kolor = k;
       tr.querySelectorAll(".nar-kolor").forEach(function (x) { x.classList.remove("akt"); });
       b.classList.add("akt");
+      podgladOdswiez();
     });
     tr.querySelector("#nar-kolory").appendChild(b);
   });
@@ -99,14 +102,31 @@
   function f1(x) { return x.toFixed(1).replace(".", ","); }
   function opisOdl(km) { return f1(km) + " km (" + f1(km / 1.852) + " mil morskich)"; }
 
-  function etykieta(lng, lat, tekst, k) {
+  function usun(w) {
+    if (w.cecha) {
+      var i = rysunki.features.indexOf(w.cecha);
+      if (i >= 0) rysunki.features.splice(i, 1);
+    }
+    if (w.etykieta) w.etykieta.marker.remove();
+    var j = wpisy.indexOf(w);
+    if (j >= 0) wpisy.splice(j, 1);
+    odswiez();
+  }
+
+  function etykieta(lng, lat, tekst, k, wpis) {
     var el = document.createElement("div");
     el.className = "nar-etykieta";
     el.style.borderColor = k;
     el.textContent = tekst;
-    var m = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-    var e = { lng: lng, lat: lat, tekst: tekst, kolor: k, marker: m };
-    etykiety.push(e);
+    var e = { lng: lng, lat: lat, tekst: tekst, kolor: k, wpis: wpis };
+    e.marker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+    el.addEventListener("click", function (ev) {
+      if (tryb === "gumka") {
+        ev.stopPropagation();
+        usun(wpis);
+        podp.textContent = "Usunięto.";
+      }
+    });
     return e;
   }
 
@@ -124,20 +144,49 @@
     odswiez();
   }
 
-  function ustawTryb(t) {
-    tryb = (tryb === t) ? null : t;
+  // Zatwierdza rysowany obiekt. Zwraca true, jesli cos zapisano.
+  function zatwierdz() {
+    var wpis = { uid: ++licznik };
+    if (tryb === "obszar" && biezace.length >= 3) {
+      wpis.cecha = { type: "Feature", properties: { kolor: kolor, uid: wpis.uid },
+        geometry: { type: "Polygon", coordinates: [biezace.concat([biezace[0]])] } };
+    } else if ((tryb === "linia" || tryb === "miarka") && biezace.length >= 2) {
+      var k = tryb === "miarka" ? "#0b7285" : kolor;
+      wpis.cecha = { type: "Feature", properties: { kolor: k, uid: wpis.uid },
+        geometry: { type: "LineString", coordinates: biezace } };
+      if (tryb === "miarka") {
+        var ost = biezace[biezace.length - 1];
+        wpis.etykieta = etykieta(ost[0], ost[1], opisOdl(dlugosc(biezace)), "#0b7285", wpis);
+      }
+    } else {
+      return false;
+    }
+    rysunki.features.push(wpis.cecha);
+    wpisy.push(wpis);
     biezace = [];
+    podgladOdswiez();
+    return true;
+  }
+
+  var OPISY = {
+    miarka: "Dotykaj kolejnych punktów na mapie. Zmiana narzędzia zatwierdza pomiar.",
+    linia: "Dotykaj kolejnych punktów linii. Zmiana narzędzia zatwierdza linię.",
+    obszar: "Dotykaj narożników obszaru (min. 3). Zmiana narzędzia zatwierdza obszar.",
+    tekst: "Dotknij miejsca na mapie i wpisz tekst.",
+    gumka: "Dotknij linii, obszaru lub napisu, aby go usunąć."
+  };
+
+  function ustawTryb(t) {
+    zatwierdz();                    // zachowaj to, co jest rysowane
+    biezace = [];
+    tryb = (tryb === t) ? null : t;
     podgladOdswiez();
     tr.querySelectorAll("[data-t]").forEach(function (b) {
       b.classList.toggle("akt", b.getAttribute("data-t") === tryb);
     });
     document.body.classList.toggle("narzedzie", !!tryb);
     map.getCanvas().style.cursor = tryb ? "crosshair" : "";
-    var op = { miarka: "Dotykaj kolejnych punktów na mapie, potem „Zakończ rysunek”.",
-      linia: "Dotykaj kolejnych punktów linii, potem „Zakończ rysunek”.",
-      obszar: "Dotykaj narożników obszaru (min. 3), potem „Zakończ rysunek”.",
-      tekst: "Dotknij miejsca na mapie i wpisz tekst." };
-    podp.textContent = tryb ? op[tryb] : "Wybierz narzędzie.";
+    podp.textContent = tryb ? OPISY[tryb] : "Wybierz narzędzie.";
   }
   tr.querySelectorAll("[data-t]").forEach(function (b) {
     b.addEventListener("click", function () { ustawTryb(b.getAttribute("data-t")); });
@@ -145,12 +194,26 @@
 
   map.on("click", function (e) {
     if (!tryb) return;
+    if (tryb === "gumka") {
+      var r = 14;
+      var warstwy = ["rys-linia", "rys-obszar"].filter(function (id) { return map.getLayer(id); });
+      var obj = map.queryRenderedFeatures(
+        [[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]], { layers: warstwy });
+      if (obj.length) {
+        var id = obj[0].properties.uid;
+        var w = wpisy.filter(function (x) { return x.uid == id; })[0];
+        if (w) { usun(w); podp.textContent = "Usunięto."; return; }
+      }
+      podp.textContent = "Nic tu nie ma. Dotknij linii, obszaru lub napisu.";
+      return;
+    }
     var p = [e.lngLat.lng, e.lngLat.lat];
     if (tryb === "tekst") {
       var t = window.prompt("Wpisz tekst:");
       if (t && t.trim()) {
-        var et = etykieta(p[0], p[1], t.trim(), kolor);
-        historia.push({ etykieta: et });
+        var wpis = { uid: ++licznik };
+        wpis.etykieta = etykieta(p[0], p[1], t.trim(), kolor, wpis);
+        wpisy.push(wpis);
       }
       return;
     }
@@ -162,50 +225,20 @@
   });
 
   tr.querySelector("#nar-koniec").addEventListener("click", function () {
-    if (!tryb || tryb === "tekst") return;
-    var wpis = {};
-    if (tryb === "obszar" && biezace.length >= 3) {
-      var pierscien = biezace.concat([biezace[0]]);
-      wpis.cecha = { type: "Feature", properties: { kolor: kolor },
-        geometry: { type: "Polygon", coordinates: [pierscien] } };
-    } else if (tryb !== "obszar" && biezace.length >= 2) {
-      var k = tryb === "miarka" ? "#0b7285" : kolor;
-      wpis.cecha = { type: "Feature", properties: { kolor: k },
-        geometry: { type: "LineString", coordinates: biezace } };
-      if (tryb === "miarka") {
-        var ost = biezace[biezace.length - 1];
-        wpis.etykieta = etykieta(ost[0], ost[1], opisOdl(dlugosc(biezace)), "#0b7285");
-      }
-    } else {
-      podp.textContent = "Za mało punktów.";
-      return;
-    }
-    rysunki.features.push(wpis.cecha);
-    historia.push(wpis);
-    biezace = [];
-    podgladOdswiez();
+    if (!zatwierdz()) podp.textContent = "Za mało punktów albo wybierz narzędzie rysowania.";
+    else podp.textContent = "Zapisano. Możesz rysować dalej.";
   });
 
   tr.querySelector("#nar-cofnij").addEventListener("click", function () {
-    var w = historia.pop();
-    if (!w) return;
-    if (w.cecha) {
-      var i = rysunki.features.indexOf(w.cecha);
-      if (i >= 0) rysunki.features.splice(i, 1);
-    }
-    if (w.etykieta) {
-      w.etykieta.marker.remove();
-      var j = etykiety.indexOf(w.etykieta);
-      if (j >= 0) etykiety.splice(j, 1);
-    }
-    odswiez();
+    if (biezace.length) { biezace.pop(); podgladOdswiez(); return; }
+    var w = wpisy[wpisy.length - 1];
+    if (w) usun(w);
   });
 
   tr.querySelector("#nar-wyczysc").addEventListener("click", function () {
     if (!window.confirm("Usunąć wszystkie rysunki, pomiary i teksty?")) return;
-    rysunki = { type: "FeatureCollection", features: [] };
-    etykiety.forEach(function (e) { e.marker.remove(); });
-    etykiety = []; historia = []; biezace = [];
+    wpisy.slice().forEach(usun);
+    biezace = [];
     podgladOdswiez();
   });
 
@@ -219,50 +252,4 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
   }
 
-  tr.querySelector("#nar-zrzut").addEventListener("click", function () {
-    podp.textContent = "Robię zrzut…";
-    map.once("render", function () {
-      var c = map.getCanvas();
-      var out = document.createElement("canvas");
-      out.width = c.width; out.height = c.height;
-      var x = out.getContext("2d");
-      x.fillStyle = "#ffffff";
-      x.fillRect(0, 0, out.width, out.height);
-      x.drawImage(c, 0, 0);
-      var ratio = c.width / c.clientWidth;
-      x.font = "bold " + Math.round(13 * ratio) + "px sans-serif";
-      x.textBaseline = "middle";
-      etykiety.forEach(function (e) {
-        var p = map.project([e.lng, e.lat]);
-        var px = p.x * ratio, py = p.y * ratio;
-        var w = x.measureText(e.tekst).width + 10 * ratio, h = 20 * ratio;
-        x.fillStyle = "rgba(255,255,255,0.92)";
-        x.fillRect(px - w / 2, py - h / 2, w, h);
-        x.lineWidth = 2 * ratio; x.strokeStyle = e.kolor;
-        x.strokeRect(px - w / 2, py - h / 2, w, h);
-        x.fillStyle = "#111"; x.textAlign = "center";
-        x.fillText(e.tekst, px, py);
-      });
-      var stopka = "Zrzut mapy · " + new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
-      var hs = 22 * ratio;
-      x.fillStyle = "rgba(0,0,0,0.65)";
-      x.fillRect(0, out.height - hs, out.width, hs);
-      x.fillStyle = "#fff"; x.textAlign = "left";
-      x.fillText(stopka, 8 * ratio, out.height - hs / 2);
-      out.toBlob(function (blob) {
-        if (!blob) { podp.textContent = "Nie udało się zrobić zrzutu."; return; }
-        var nazwa = "mapa_" + new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-") + ".jpg";
-        var plik = new File([blob], nazwa, { type: "image/jpeg" });
-        podp.textContent = "Zrzut gotowy.";
-        if (navigator.canShare && navigator.canShare({ files: [plik] })) {
-          navigator.share({ files: [plik], title: "Zrzut mapy" }).catch(function (err) {
-            if (err && err.name !== "AbortError") pobierz(blob, nazwa);
-          });
-        } else {
-          pobierz(blob, nazwa);
-        }
-      }, "image/jpeg", 0.92);
-    });
-    map.triggerRepaint();
-  });
-})();
+  tr.querySelector("#nar-zrzut").addEventListe
