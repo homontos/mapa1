@@ -1,7 +1,7 @@
 (function () {
   var API = "https://neptun.in.ua/api/v1/alerts";
-  var GEO_OBL = "https://neptun.in.ua/oblasts.geojson";
-  var GEO_RAI = "https://neptun.in.ua/raions.geojson";
+    var GEO_OBL = "granice_obwody.geojson";
+  var GEO_RAI = "granice_rejony.geojson";
   var widoczne = true;
   var poligony = { type: "FeatureCollection", features: [] };
   var kola = { type: "FeatureCollection", features: [] };
