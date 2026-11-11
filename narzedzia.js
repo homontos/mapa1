@@ -4,6 +4,18 @@
   var podglad = { type: "FeatureCollection", features: [] };
   var wpisy = [];
 
+  var STRONY = [["Swoje", "F", "3"], ["Przeciwnik", "H", "6"], ["Neutralne", "N", "4"], ["Nieznane", "U", "1"]];
+  var TYPY = [["piechota", "Piechota"], ["pancerne", "Pancerne"], ["artyleria", "Artyleria"],
+    ["opl", "Obrona powietrzna"], ["lotnictwo", "Lotnictwo"], ["marynarka", "Marynarka"], ["sof", "SOF"]];
+  var FUNKCJE = { piechota: "UCI---", pancerne: "UCA---", artyleria: "UCF---", opl: "UCD---" };
+
+  function sidc(litera, cyfra, typ) {
+    if (typ === "sof") return "10" + "0" + cyfra + "10" + "0" + "0" + "00" + "121700" + "0000";
+    if (typ === "lotnictwo") return "S" + litera + "A-MF------";
+    if (typ === "marynarka") return "S" + litera + "S-C-------";
+    return "S" + litera + "G-" + FUNKCJE[typ] + "--";
+  }
+
   var st = document.createElement("style");
   st.textContent =
     "body.narzedzie .maplibregl-popup,body.narzedzie #szczegoly{display:none!important}" +
@@ -11,6 +23,8 @@
     "#narzedzia .siatka{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px}" +
     "#narzedzia .szeroki{grid-column:span 2}" +
     "#narzedzia button.akt{background:#d0ebff;border:1px solid #1c7ed6;font-weight:bold}" +
+    "#narzedzia select,#narzedzia input[type=text]{width:100%;box-sizing:border-box;" +
+    "font-size:16px;padding:6px;margin:3px 0}" +
     ".nar-kolor{width:26px;height:26px;border-radius:50%;border:2px solid #fff;" +
     "box-shadow:0 0 0 1px #999;padding:0!important}" +
     ".nar-kolor.akt{box-shadow:0 0 0 3px #1c7ed6!important}" +
@@ -25,16 +39,21 @@
   panel.className = "panel p-zwiniety";
   var nag = document.createElement("div");
   nag.className = "p-nag";
-  nag.innerHTML = "<span>Narzędzia (miarka, rysunki, zrzut)</span><button>+</button>";
+  nag.innerHTML = "<span>Narzędzia (miarka, rysunki, znaki, zrzut)</span><button>+</button>";
   var tr = document.createElement("div");
   tr.className = "p-tresc";
   tr.innerHTML =
     '<div class="siatka">' +
     '<button data-t="miarka">📏 Miarka</button><button data-t="linia">✏️ Linia</button>' +
     '<button data-t="obszar">⬠ Obszar</button><button data-t="tekst">🔤 Tekst</button>' +
+    '<button data-t="znak" class="szeroki">🛡 Znak taktyczny</button>' +
     '<button data-t="gumka" class="szeroki">🧽 Gumka (dotknij, aby usunąć)</button>' +
     '<button id="nar-koniec">✔ Zakończ rysunek</button><button id="nar-cofnij">↩ Cofnij</button>' +
     '<button id="nar-wyczysc">🗑 Wyczyść wszystko</button><button id="nar-zrzut">📷 Zrzut JPEG</button></div>' +
+    '<div id="nar-znak" style="display:none">' +
+    '<select id="znak-strona"></select><select id="znak-typ"></select>' +
+    '<input type="text" id="znak-podpis" placeholder="Podpis (opcjonalnie), np. 1 bat." maxlength="30">' +
+    '<div style="font-size:10px;color:#666">Symbole: milsymbol (MIT)</div></div>' +
     '<div id="nar-kolory" style="display:flex;gap:8px;margin:6px 0"></div>' +
     '<div id="nar-podp" style="font-size:12px;color:#444">Wybierz narzędzie.</div>';
   panel.appendChild(nag);
@@ -45,6 +64,10 @@
   });
   if (lewa) lewa.appendChild(panel);
   var podp = tr.querySelector("#nar-podp");
+  var selStrona = tr.querySelector("#znak-strona"), selTyp = tr.querySelector("#znak-typ");
+  var poleZnak = tr.querySelector("#nar-znak"), polePodpis = tr.querySelector("#znak-podpis");
+  STRONY.forEach(function (s, i) { var o = document.createElement("option"); o.value = i; o.textContent = s[0]; selStrona.appendChild(o); });
+  TYPY.forEach(function (t) { var o = document.createElement("option"); o.value = t[0]; o.textContent = t[1]; selTyp.appendChild(o); });
 
   ["#e03131", "#1c7ed6", "#2f9e44", "#111111"].forEach(function (k, i) {
     var b = document.createElement("button");
@@ -108,6 +131,7 @@
       if (i >= 0) rysunki.features.splice(i, 1);
     }
     if (w.etykieta) w.etykieta.marker.remove();
+    if (w.sprzatnij) w.sprzatnij();
     var j = wpisy.indexOf(w);
     if (j >= 0) wpisy.splice(j, 1);
     odswiez();
@@ -121,15 +145,51 @@
     var e = { lng: lng, lat: lat, tekst: tekst, kolor: k, wpis: wpis };
     e.marker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
     el.addEventListener("click", function (ev) {
-      if (tryb === "gumka") {
-        ev.stopPropagation();
-        usun(wpis);
-        podp.textContent = "Usunięto.";
-      }
+      if (tryb === "gumka") { ev.stopPropagation(); usun(wpis); podp.textContent = "Usunięto."; }
     });
     return e;
   }
 
+  // ---------- Znaki taktyczne ----------
+  function zaladujMs(cb) {
+    if (window.ms) { cb(); return; }
+    var s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/milsymbol@3.0.3/dist/milsymbol.js";
+    s.onload = cb;
+    s.onerror = function () { podp.textContent = "Nie udało się załadować biblioteki znaków."; };
+    document.head.appendChild(s);
+  }
+
+  function postawZnak(lng, lat) {
+    if (!window.ms) { podp.textContent = "Ładuję bibliotekę znaków, spróbuj za chwilę."; zaladujMs(function () {}); return; }
+    var s = STRONY[+selStrona.value], typ = selTyp.value, podpis = polePodpis.value.trim();
+    var wpis = { uid: ++licznik };
+    var sym = new ms.Symbol(sidc(s[1], s[2], typ),
+      { size: 28, uniqueDesignation: podpis, outlineWidth: 3, outlineColor: "#ffffff" });
+    var sz = sym.getSize(), an = sym.getAnchor();
+    var img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sym.asSVG());
+    img.style.display = "block";
+    img.width = sz.width; img.height = sz.height;
+    var el = document.createElement("div");
+    el.style.cssText = "width:" + sz.width + "px;height:" + sz.height + "px;cursor:pointer";
+    el.appendChild(img);
+    el.addEventListener("click", function (ev) {
+      if (tryb === "gumka") { ev.stopPropagation(); usun(wpis); podp.textContent = "Usunięto."; }
+    });
+    wpis.marker = new maplibregl.Marker({ element: el, anchor: "top-left", offset: [-an.x, -an.y] })
+      .setLngLat([lng, lat]).addTo(map);
+    wpis.sprzatnij = function () { wpis.marker.remove(); };
+    wpis.rysuj = function (x, ratio) {
+      var p = map.project([lng, lat]);
+      x.drawImage(img, (p.x - an.x) * ratio, (p.y - an.y) * ratio, sz.width * ratio, sz.height * ratio);
+    };
+    wpisy.push(wpis);
+    polePodpis.value = "";
+    podp.textContent = "Postawiono znak. Dotknij mapy, aby dodać kolejny.";
+  }
+
+  // ---------- Rysowanie ----------
   function podgladOdswiez() {
     var c = [];
     if (biezace.length > 1) {
@@ -144,7 +204,6 @@
     odswiez();
   }
 
-  // Zatwierdza rysowany obiekt. Zwraca true, jesli cos zapisano.
   function zatwierdz() {
     var wpis = { uid: ++licznik };
     if (tryb === "obszar" && biezace.length >= 3) {
@@ -173,17 +232,20 @@
     linia: "Dotykaj kolejnych punktów linii. Zmiana narzędzia zatwierdza linię.",
     obszar: "Dotykaj narożników obszaru (min. 3). Zmiana narzędzia zatwierdza obszar.",
     tekst: "Dotknij miejsca na mapie i wpisz tekst.",
-    gumka: "Dotknij linii, obszaru lub napisu, aby go usunąć."
+    znak: "Wybierz stronę i typ, potem dotknij mapy, aby postawić znak.",
+    gumka: "Dotknij linii, obszaru, napisu lub znaku, aby go usunąć."
   };
 
   function ustawTryb(t) {
-    zatwierdz();                    // zachowaj to, co jest rysowane
+    zatwierdz();
     biezace = [];
     tryb = (tryb === t) ? null : t;
     podgladOdswiez();
     tr.querySelectorAll("[data-t]").forEach(function (b) {
       b.classList.toggle("akt", b.getAttribute("data-t") === tryb);
     });
+    poleZnak.style.display = tryb === "znak" ? "block" : "none";
+    if (tryb === "znak") zaladujMs(function () {});
     document.body.classList.toggle("narzedzie", !!tryb);
     map.getCanvas().style.cursor = tryb ? "crosshair" : "";
     podp.textContent = tryb ? OPISY[tryb] : "Wybierz narzędzie.";
@@ -204,10 +266,11 @@
         var w = wpisy.filter(function (x) { return x.uid == id; })[0];
         if (w) { usun(w); podp.textContent = "Usunięto."; return; }
       }
-      podp.textContent = "Nic tu nie ma. Dotknij linii, obszaru lub napisu.";
+      podp.textContent = "Nic tu nie ma. Dotknij linii, obszaru, napisu lub znaku.";
       return;
     }
     var p = [e.lngLat.lng, e.lngLat.lat];
+    if (tryb === "znak") { postawZnak(p[0], p[1]); return; }
     if (tryb === "tekst") {
       var t = window.prompt("Wpisz tekst:");
       if (t && t.trim()) {
@@ -236,7 +299,7 @@
   });
 
   tr.querySelector("#nar-wyczysc").addEventListener("click", function () {
-    if (!window.confirm("Usunąć wszystkie rysunki, pomiary i teksty?")) return;
+    if (!window.confirm("Usunąć wszystkie rysunki, pomiary, teksty i znaki?")) return;
     wpisy.slice().forEach(usun);
     biezace = [];
     podgladOdswiez();
@@ -267,6 +330,7 @@
       x.font = "bold " + Math.round(13 * ratio) + "px sans-serif";
       x.textBaseline = "middle";
       wpisy.forEach(function (w) {
+        if (w.rysuj) w.rysuj(x, ratio);
         var e = w.etykieta;
         if (!e) return;
         var p = map.project([e.lng, e.lat]);
