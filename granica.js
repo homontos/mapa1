@@ -12,19 +12,20 @@
 
   var st = document.createElement("style");
   st.textContent =
-    "#granica-odz{display:flex;align-items:center;padding:0 8px;color:#fff;" +
-    "font:bold 12px sans-serif;white-space:nowrap;cursor:pointer;background:#495057}" +
-    "#granica-odz.luzem{position:fixed;right:10px;bottom:70px;z-index:6;padding:7px 10px;" +
-    "border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.3)}";
+    "#granica-odz{flex:none;display:flex;align-items:center;justify-content:center;" +
+    "width:30px;font:18px/1 sans-serif;cursor:pointer;color:#adb5bd;user-select:none}" +
+    "#granica-odz.luzem{position:fixed;right:10px;bottom:70px;z-index:6;width:34px;height:34px;" +
+    "background:#111;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.3)}";
   document.head.appendChild(st);
 
   var odznaka = document.createElement("div");
   odznaka.id = "granica-odz";
-  odznaka.textContent = "Granica PL: ładowanie…";
+  odznaka.textContent = "●";
+  odznaka.title = "Granica Polski: ładowanie…";
   var pasek = document.getElementById("pasek"), utc = document.getElementById("pasek-utc");
   if (pasek && utc) {
     pasek.insertBefore(odznaka, utc.nextSibling);
-  } else {                       // gdy paska jeszcze nie ma: znacznik luzem nad nim
+  } else {
     odznaka.className = "luzem";
     document.body.appendChild(odznaka);
   }
@@ -53,17 +54,21 @@
 
   var lista = [], lacznie = 0, godz = "";
 
+  function ikona(znak, kolor, opis) {
+    odznaka.textContent = znak;
+    odznaka.style.color = kolor;
+    odznaka.title = opis;
+  }
+
   function pokazOdznake() {
     if (!lista.length) {
-      odznaka.textContent = "Granica PL: brak obiektów w " + PROMIEN_KM + " km";
-      odznaka.style.background = "#2b8a3e";
+      ikona("●", "#51cf66", "Brak obiektów w promieniu " + PROMIEN_KM + " km od granicy Polski");
       return;
     }
     var n = lista[0];
-    odznaka.textContent = n.km === 0
-      ? "⚠ nad Polską (" + lista.length + ")"
-      : "⚠ " + Math.round(n.km) + " km od granicy (" + lista.length + ")";
-    odznaka.style.background = n.km < 50 ? "#c92a2a" : "#e8590c";
+    ikona("▲", n.km < 50 ? "#ff6b6b" : "#ff922b",
+      (n.km === 0 ? "Obiekt nad Polską" : "Najbliższy obiekt: " + Math.round(n.km) + " km od granicy") +
+      " (obiektów: " + lista.length + ")");
   }
 
   odznaka.addEventListener("click", function () {
@@ -75,7 +80,7 @@
       d.textContent = t;
       box.appendChild(d);
     }
-    wiersz("Obiektów w NEPTUN z dokładną pozycją: " + lacznie + " (stan z " + godz + ")");
+    wiersz("Obiektów w NEPTUN z dokładną pozycją: " + lacznie + (godz ? " (stan z " + godz + ")" : ""));
     wiersz("W promieniu " + PROMIEN_KM + " km od granicy Polski: " + lista.length);
     lista.slice(0, 8).forEach(function (x) {
       var t = x.t, gdzie = t.locality || t.district || t.region || "";
@@ -113,8 +118,7 @@
         pokazOdznake();
       })
       .catch(function () {
-        odznaka.textContent = "Granica PL: brak danych z NEPTUN";
-        odznaka.style.background = "#495057";
+        ikona("●", "#adb5bd", "Brak danych z NEPTUN");
       });
   }
   odswiez();
