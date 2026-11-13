@@ -1,6 +1,6 @@
 (function () {
   var API = "https://neptun.in.ua/api/v1/threats";
-  var PROMIEN_KM = 1500;
+  var PROMIEN_KM = 100;
   var POLSKA = [[14.12,53.93],[16.0,54.55],[17.5,54.9],[18.5,54.95],[19.6,54.55],
     [19.9,54.4],[20.4,54.38],[22.8,54.38],[23.5,54.2],[23.55,53.9],[23.95,52.75],
     [23.6,52.1],[23.55,51.55],[24.05,50.85],[23.5,50.4],[22.7,49.6],[22.85,49.05],
@@ -10,18 +10,24 @@
   var NAZWY = { uav: "Dron", recon: "Dron rozpoznawczy", missile: "Rakieta",
     ballistic: "Rakieta balistyczna", kab: "Bomba kierowana KAB", mig31k: "MiG-31K", unknown: "Obiekt" };
 
-  var pasek = document.getElementById("pasek");
-  var utc = document.getElementById("pasek-utc");
-  if (!pasek || !utc) return;
-
   var st = document.createElement("style");
   st.textContent =
-    "#pasek-ost{flex:none;display:none;align-items:center;padding:0 8px;color:#fff;" +
-    "font:bold 12px sans-serif;white-space:nowrap;cursor:pointer}";
+    "#granica-odz{display:flex;align-items:center;padding:0 8px;color:#fff;" +
+    "font:bold 12px sans-serif;white-space:nowrap;cursor:pointer;background:#495057}" +
+    "#granica-odz.luzem{position:fixed;right:10px;bottom:70px;z-index:6;padding:7px 10px;" +
+    "border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.3)}";
   document.head.appendChild(st);
+
   var odznaka = document.createElement("div");
-  odznaka.id = "pasek-ost";
-  pasek.insertBefore(odznaka, utc.nextSibling);
+  odznaka.id = "granica-odz";
+  odznaka.textContent = "Granica PL: ładowanie…";
+  var pasek = document.getElementById("pasek"), utc = document.getElementById("pasek-utc");
+  if (pasek && utc) {
+    pasek.insertBefore(odznaka, utc.nextSibling);
+  } else {                       // gdy paska jeszcze nie ma: znacznik luzem nad nim
+    odznaka.className = "luzem";
+    document.body.appendChild(odznaka);
+  }
 
   function wPolsce(lon, lat) {
     var w = false;
@@ -31,7 +37,6 @@
     }
     return w;
   }
-  // odleglosc w km od granicy (0, jesli punkt jest w Polsce)
   function dystans(lon, lat) {
     if (wPolsce(lon, lat)) return 0;
     var kx = 111.32 * Math.cos(lat * Math.PI / 180), ky = 110.57, min = Infinity;
@@ -46,20 +51,22 @@
     return min;
   }
 
-  var lista = [];
+  var lista = [], lacznie = 0, godz = "";
 
   function pokazOdznake() {
-    if (!lista.length) { odznaka.style.display = "none"; return; }
+    if (!lista.length) {
+      odznaka.textContent = "Granica PL: brak obiektów w " + PROMIEN_KM + " km";
+      odznaka.style.background = "#2b8a3e";
+      return;
+    }
     var n = lista[0];
     odznaka.textContent = n.km === 0
       ? "⚠ nad Polską (" + lista.length + ")"
       : "⚠ " + Math.round(n.km) + " km od granicy (" + lista.length + ")";
     odznaka.style.background = n.km < 50 ? "#c92a2a" : "#e8590c";
-    odznaka.style.display = "flex";
   }
 
   odznaka.addEventListener("click", function () {
-    if (!lista.length) return;
     var box = document.createElement("div");
     function wiersz(t, styl) {
       var d = document.createElement("div");
@@ -68,10 +75,10 @@
       d.textContent = t;
       box.appendChild(d);
     }
-    wiersz("Obiekty w promieniu " + PROMIEN_KM + " km od granicy Polski: " + lista.length);
+    wiersz("Obiektów w NEPTUN z dokładną pozycją: " + lacznie + " (stan z " + godz + ")");
+    wiersz("W promieniu " + PROMIEN_KM + " km od granicy Polski: " + lista.length);
     lista.slice(0, 8).forEach(function (x) {
-      var t = x.t;
-      var gdzie = t.locality || t.district || t.region || "";
+      var t = x.t, gdzie = t.locality || t.district || t.region || "";
       wiersz("• " + (NAZWY[t.type] || NAZWY.unknown) + " – " +
         (x.km === 0 ? "nad Polską" : Math.round(x.km) + " km od granicy") +
         (gdzie ? " (" + gdzie + ")" : ""));
@@ -80,7 +87,9 @@
       "(błąd rzędu kilkudziesięciu km). Nie zastępuje Alertu RCB, syren ani komunikatów " +
       "Dowództwa Operacyjnego.", "font-size:11px;color:#666;margin-top:8px");
     if (window.pokazSzczegoly) window.pokazSzczegoly("Blisko granicy Polski", box);
-    map.flyTo({ center: [lista[0].t.lon, lista[0].t.lat], zoom: Math.max(map.getZoom(), 7) });
+    if (lista.length) {
+      map.flyTo({ center: [lista[0].t.lon, lista[0].t.lat], zoom: Math.max(map.getZoom(), 7) });
+    }
   });
 
   function odswiez() {
@@ -89,17 +98,24 @@
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (d) {
         var nowa = [];
+        lacznie = 0;
         (d.threats || []).forEach(function (t) {
-          if (t.status === "resolved" || t.status === "stale" || t.advisory || t.areaOnly) return;
+          if (t.status === "resolved" || t.areaOnly) return;
           if (typeof t.lat !== "number" || typeof t.lon !== "number") return;
+          lacznie++;
+          if (t.status === "stale" || t.advisory) return;
           var km = dystans(t.lon, t.lat);
           if (km <= PROMIEN_KM) nowa.push({ t: t, km: km });
         });
         nowa.sort(function (a, b) { return a.km - b.km; });
         lista = nowa;
+        godz = new Date().toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
         pokazOdznake();
       })
-      .catch(function () {});
+      .catch(function () {
+        odznaka.textContent = "Granica PL: brak danych z NEPTUN";
+        odznaka.style.background = "#495057";
+      });
   }
   odswiez();
   setInterval(odswiez, 30000);
