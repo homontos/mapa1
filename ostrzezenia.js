@@ -1,18 +1,40 @@
 (function () {
   var widoczne = true;
   var dane = { type: "FeatureCollection", features: [] };
-  var KOLOR = ["match", ["get", "max"], 3, "#e03131", 2, "#f08c00", "#f2c200"];
+  var KOLORY = { 1: "#f2c200", 2: "#f08c00", 3: "#e03131" };
+
+  function plakietka(kolor) {
+    var c = document.createElement("canvas");
+    c.width = 64; c.height = 64;
+    var x = c.getContext("2d");
+    x.beginPath();
+    x.arc(32, 32, 28, 0, Math.PI * 2);
+    x.fillStyle = kolor;
+    x.fill();
+    x.lineWidth = 4;
+    x.strokeStyle = "#ffffff";
+    x.stroke();
+    x.fillStyle = "#ffffff";
+    x.font = "bold 40px sans-serif";
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    x.fillText("!", 32, 35);
+    return x.getImageData(0, 0, 64, 64);
+  }
 
   function dodaj() {
+    [1, 2, 3].forEach(function (s) {
+      if (!map.hasImage("ost-" + s)) map.addImage("ost-" + s, plakietka(KOLORY[s]));
+    });
     if (map.getSource("ostrzezenia")) return;
     map.addSource("ostrzezenia", { type: "geojson", data: dane });
     map.addLayer({
-      id: "ostrzezenia", type: "circle", source: "ostrzezenia",
-      layout: { visibility: widoczne ? "visible" : "none" },
-      paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 12, 8, 30],
-        "circle-color": KOLOR, "circle-opacity": 0.4,
-        "circle-stroke-width": 2, "circle-stroke-color": KOLOR
+      id: "ostrzezenia", type: "symbol", source: "ostrzezenia",
+      layout: {
+        visibility: widoczne ? "visible" : "none",
+        "icon-image": ["match", ["get", "max"], 3, "ost-3", 2, "ost-2", "ost-1"],
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 4, 0.5, 8, 0.75],
+        "icon-allow-overlap": true, "icon-ignore-placement": true
       }
     });
   }
@@ -46,8 +68,9 @@
         (w.powiaty ? " · powiatów: " + w.powiaty : ""));
       if (w.przebieg) wiersz(w.przebieg, "font-size:12px;color:#444");
     });
-    wiersz("Dane: IMGW-PIB (danepubliczne.imgw.pl). Informacja pomocnicza, nie zastępuje " +
-      "oficjalnych komunikatów IMGW, Alertu RCB ani służb.", "font-size:11px;color:#666;margin-top:8px");
+    wiersz("Dane: IMGW-PIB (danepubliczne.imgw.pl). Susza hydrologiczna jest pomijana. " +
+      "Informacja pomocnicza, nie zastępuje oficjalnych komunikatów IMGW, Alertu RCB ani służb.",
+      "font-size:11px;color:#666;margin-top:8px");
     window.pokazSzczegoly("Ostrzeżenia: woj. " + String(p.nazwa).toLowerCase(), box);
   });
   map.on("mouseenter", "ostrzezenia", function () { map.getCanvas().style.cursor = "pointer"; });
@@ -58,11 +81,12 @@
   blok.style.marginTop = "8px";
   blok.innerHTML =
     '<label><input type="checkbox" id="ost-przel" checked> Ostrzeżenia IMGW (Polska)</label>' +
-    '<div class="leg"><span class="kropka" style="background:#f2c200"></span><span>1. stopień</span></div>' +
-    '<div class="leg"><span class="kropka" style="background:#f08c00"></span><span>2. stopień</span></div>' +
-    '<div class="leg"><span class="kropka" style="background:#e03131"></span><span>3. stopień</span></div>' +
+    '<div class="leg"><span class="kropka" style="background:#f2c200"></span><span>! 1. stopień</span></div>' +
+    '<div class="leg"><span class="kropka" style="background:#f08c00"></span><span>! 2. stopień</span></div>' +
+    '<div class="leg"><span class="kropka" style="background:#e03131"></span><span>! 3. stopień</span></div>' +
     '<div id="ost-status" style="font-size:11px;color:#555">brak danych</div>' +
-    '<div style="font-size:10px;color:#666">Dane: IMGW-PIB. Kolor = najwyższy stopień w województwie.</div>';
+    '<div style="font-size:10px;color:#666">Dane: IMGW-PIB. Kolor = najwyższy stopień w województwie. ' +
+    'Bez suszy hydrologicznej.</div>';
   tresc.appendChild(blok);
   document.getElementById("ost-przel").addEventListener("change", function () {
     widoczne = this.checked;
@@ -75,11 +99,17 @@
     fetch("ostrzezenia.json?t=" + Date.now())
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (d) {
-        var cechy = Object.keys(d.woj || {}).map(function (k) {
+        var cechy = [];
+        Object.keys(d.woj || {}).forEach(function (k) {
           var g = d.woj[k];
-          return { type: "Feature",
-            properties: { nazwa: g.nazwa, max: g.max, lista: JSON.stringify(g.lista) },
-            geometry: { type: "Point", coordinates: [g.lon, g.lat] } };
+          var lista = (g.lista || []).filter(function (w) {
+            return !/susz/i.test(String(w.zjawisko || ""));    // bez suszy hydrologicznej
+          });
+          if (!lista.length) return;
+          var max = Math.max.apply(null, lista.map(function (w) { return w.stopien || 1; }));
+          cechy.push({ type: "Feature",
+            properties: { nazwa: g.nazwa, max: Math.min(3, Math.max(1, max)), lista: JSON.stringify(lista) },
+            geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
         });
         dane = { type: "FeatureCollection", features: cechy };
         var z = map.getSource("ostrzezenia");
