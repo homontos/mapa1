@@ -1,0 +1,16 @@
+{
+  "name": "Mapa: statki, samoloty, pogoda",
+  "short_name": "Mapa",
+  "description": "Prywatna mapa: statki, samoloty, pogoda i alarmy",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b2545",
+  "theme_color": "#111111",
+  "lang": "pl",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
