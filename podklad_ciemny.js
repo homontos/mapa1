@@ -3,6 +3,7 @@
   // Zostaw puste, aby uzywac wlasnego ciemnego podkladu (bez klucza).
   var KLUCZ_CARTO = "cb1_59qx_1_374b471616a9fde45c69285a";
   var URL_CARTO = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key=";
+  
 
   var szara = document.getElementById("btn-szara");
   if (!szara) return;
