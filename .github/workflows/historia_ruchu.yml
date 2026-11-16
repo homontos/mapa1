@@ -1,0 +1,38 @@
+name: Historia ruchu
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: historia-ruchu
+  cancel-in-progress: false
+
+jobs:
+  zapisz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Pobierz poprzednia historie
+        run: |
+          mkdir -p dane_wyj
+          git fetch --depth=1 origin dane && git show FETCH_HEAD:historia_ruchu.json > dane_wyj/poprzednia.json || echo "{}" > dane_wyj/poprzednia.json
+      - run: python historia_ruchu.py
+      - name: Opublikuj na galezi dane
+        run: |
+          cp dane_wyj/historia_ruchu.json dane_wyj/mil_teraz.json /tmp/
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan dane-nowa
+          git rm -rf . > /dev/null 2>&1
+          cp /tmp/historia_ruchu.json /tmp/mil_teraz.json .
+          git add historia_ruchu.json mil_teraz.json
+          git commit -m "Historia ruchu"
+          git push --force origin dane-nowa:dane
