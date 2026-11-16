@@ -1,5 +1,5 @@
 (function () {
-  var KLUCZ = "";                     // klucz z developer.tomtom.com
+  var KLUCZ = "8b8c544a-2aac-4e28-9a13-3e650d6b8465";                     // klucz z developer.tomtom.com
   var PRZYBLIZENIE_OD = 11;           // korki widoczne od tego przyblizenia (9 = szeroko, 13 = bardzo blisko)
   var TROJMIASTO = [18.2, 54.2, 18.95, 54.8];
   var widoczne = true;
