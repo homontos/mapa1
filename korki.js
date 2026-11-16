@@ -1,6 +1,7 @@
 (function () {
   // Wklej tu klucz z developer.tomtom.com:
   var KLUCZ = "KGJrFz6I7mnOIQpzp1arM6dFmCnHaEhl";
+  var PRZYBLIZENIE_OD = 8,6;          
   var TROJMIASTO = [18.2, 54.2, 18.95, 54.8];     // ladujemy kafelki tylko stad
   var widoczne = true;
 
