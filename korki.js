@@ -22,7 +22,7 @@
 
   document.getElementById("korki-leć").addEventListener("click", function (e) {
     e.preventDefault();
-    map.flyTo({ center: [18.6, 54.45], zoom: 11 });
+    map.flyTo({ center: [18.6, 54.45], zoom: 6.3 });
   });
 
   function dodaj() {
