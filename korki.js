@@ -37,7 +37,7 @@
     });
     map.addLayer({
       id: "korki", type: "line", source: "korki", "source-layer": "Traffic flow",
-      minzoom: 9,
+      minzoom: 6.3,
       layout: { visibility: widoczne ? "visible" : "none", "line-cap": "round" },
       paint: {
         "line-color": ["step", ["to-number", ["get", "traffic_level"], 1],
