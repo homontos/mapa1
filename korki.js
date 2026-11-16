@@ -1,6 +1,6 @@
 (function () {
   var KLUCZ = "KGJrFz6I7mnOIQpzp1arM6dFmCnHaEhl";                     // klucz z developer.tomtom.com
-  var PRZYBLIZENIE_OD = 7;          // korki widoczne od tego przyblizenia
+  var PRZYBLIZENIE_OD = 6.3;          // korki widoczne od tego przyblizenia
   var POLSKA = [14.0, 48.9, 24.3, 55.0];
   var widoczne = true;
 
