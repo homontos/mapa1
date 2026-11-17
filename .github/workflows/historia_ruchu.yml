@@ -21,26 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Petla co 5 minut (ok. 55 minut)
+      - name: Petla zapisow co 5 minut (ok. 50 minut)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p dane_wyj
-          git fetch --depth=1 origin dane && git show FETCH_HEAD:historia_ruchu.json > dane_wyj/poprzednia.json || echo "{}" > dane_wyj/poprzednia.json
-          for i in $(seq 1 11); do
-            python historia_ruchu.py || echo "przebieg nieudany"
-            if [ -f dane_wyj/historia_ruchu.json ]; then
-              cp dane_wyj/historia_ruchu.json dane_wyj/poprzednia.json
-              rm -rf /tmp/pub && mkdir /tmp/pub
-              cp dane_wyj/historia_ruchu.json dane_wyj/mil_teraz.json /tmp/pub/
-              cd /tmp/pub
-              git init -q
-              git config user.name "github-actions"
-              git config user.email "actions@users.noreply.github.com"
-              git add .
-              git commit -q -m "Historia ruchu"
-              git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/dane || echo "push nieudany"
-              cd "$GITHUB_WORKSPACE"
-            fi
-            [ "$i" -lt 11 ] && sleep 280
-          done
+        run: python petla_historii.py
