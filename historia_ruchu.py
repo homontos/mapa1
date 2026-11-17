@@ -30,29 +30,37 @@ def liczba(x, nd=None):
 
 teraz = int(time.time())
 
-# --- samoloty wojskowe ---
-samoloty, zrodlo = None, ""
+# --- samoloty wojskowe: laczymy wszystkie zrodla po kodzie hex ---
+wg_hex, zrodla_ok = {}, []
 for url in ZRODLA:
+    host = url.split("/")[2]
     try:
         d = pobierz(url)
         lista = d.get("ac") or d.get("aircraft") or []
-        samoloty = []
-        for a in lista:
-            lat, lon = a.get("lat"), a.get("lon")
-            if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
-                continue
-            if not (S <= lat <= N and W <= lon <= E):
-                continue
-            alt = a.get("alt_baro")
-            alt = 0 if alt == "ground" else liczba(alt)
-            samoloty.append([str(a.get("hex", "")).lower(), round(lat, 3), round(lon, 3),
-                             liczba(a.get("track")), alt,
-                             str(a.get("flight") or "").strip(), a.get("t") or ""])
-        zrodlo = url.split("/")[2]
-        print("Zrodlo samolotow:", zrodlo, "| w Europie:", len(samoloty), "z", len(lista))
-        break
     except Exception as e:
-        print("Blad zrodla", url, type(e).__name__, str(e)[:100])
+        print("Blad zrodla", host, type(e).__name__, str(e)[:100])
+        continue
+    dodane, w_europie = 0, 0
+    for a in lista:
+        lat, lon = a.get("lat"), a.get("lon")
+        if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+            continue
+        if not (S <= lat <= N and W <= lon <= E):
+            continue
+        w_europie += 1
+        hx = str(a.get("hex", "")).lower()
+        if not hx or hx in wg_hex:
+            continue
+        alt = a.get("alt_baro")
+        alt = 0 if alt == "ground" else liczba(alt)
+        wg_hex[hx] = [hx, round(lat, 3), round(lon, 3), liczba(a.get("track")), alt,
+                      str(a.get("flight") or "").strip(), a.get("t") or ""]
+        dodane += 1
+    zrodla_ok.append(host)
+    print("Zrodlo", host, "| w Europie:", w_europie, "| nowych po scaleniu:", dodane)
+    time.sleep(1.5)                      # limit: 1 zapytanie na sekunde
+samoloty = list(wg_hex.values()) if zrodla_ok else None
+zrodlo = "+".join(zrodla_ok)
 
 # --- obiekty z Neptuna ---
 neptun = None
@@ -90,4 +98,4 @@ with open(os.path.join(KAT, "historia_ruchu.json"), "w", encoding="utf-8") as f:
     json.dump({"v": 1, "snapshoty": snap}, f, separators=(",", ":"))
 with open(os.path.join(KAT, "mil_teraz.json"), "w", encoding="utf-8") as f:
     json.dump({"t": teraz, "zrodlo": zrodlo, "a": samoloty or []}, f, separators=(",", ":"))
-print("Snapshotow w historii:", len(snap))
+print("Samolotow razem:", len(samoloty or []), "| snapshotow w historii:", len(snap))
