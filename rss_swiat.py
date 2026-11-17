@@ -170,6 +170,15 @@ if kandydaci:
         print("Blad AI:", type(e).__name__, str(e)[:200])
         if not stare:
             raise SystemExit("Brak danych")
+            except urllib.error.HTTPError as e:
+    print("Blad AI:", e.code, e.read().decode("utf-8", "ignore")[:300])
+except Exception as e:
+    print("Blad AI:", type(e).__name__, str(e)[:200])
+
+
+
+
+
 
 granica = int(time.time()) - DNI * 86400
 wszystkie = sorted([z for z in stare + nowe if z["t"] >= granica], key=lambda z: -z["t"])
