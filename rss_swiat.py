@@ -24,7 +24,7 @@ KATEGORIE = ["rakieta", "dron", "starcie", "marynarka", "alarm", "inne"]
 MAKS_NOWYCH = 30
 DNI = 7
 KLUCZ = os.environ.get("GEMINI_API_KEY", "").strip()
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
 SLOWA = re.compile(
     r"missile|drone|uav|strike|attack|airstrike|military|army|navy|naval|warship|troops|shell|rocket|"
     r"offensive|ceasefire|fighter|submarine|artillery|houthi|hezbollah|hamas|idf|invasion|frigate|"
