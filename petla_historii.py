@@ -5,7 +5,7 @@ import sys
 import tempfile
 import time
 
-CZAS_PETLI_S = 27 * 60       # ile trwa jeden przebieg
+CZAS_PETLI_S = 50 * 60       # ile trwa jeden przebieg
 CO_S = 300                   # odstep miedzy zapisami
 repo = os.environ["GITHUB_REPOSITORY"]
 token = os.environ["GH_TOKEN"]
@@ -44,20 +44,36 @@ def publikuj():
     return True
 
 
+def pobierz_poprzednia(sciezka):
+    """True = pobrano, None = galezi/pliku jeszcze nie ma (zaczynamy od nowa), False = blad."""
+    for proba in range(1, 5):
+        kod, _, err = sh(["git", "fetch", "--depth=1", "origin", "dane"])
+        if kod == 0:
+            kod2, out2, _ = sh(["git", "show", "FETCH_HEAD:historia_ruchu.json"])
+            if kod2 == 0 and out2.strip().startswith("{"):
+                with open(sciezka, "w", encoding="utf-8") as f:
+                    f.write(out2)
+                print("Pobrano poprzednia historie.")
+                return True
+            print("Galaz dane nie zawiera pliku historii.")
+            return None
+        if "couldn't find remote ref" in (err or "").lower():
+            print("Galaz dane jeszcze nie istnieje.")
+            return None
+        print("Blad pobierania historii (proba", proba, "):", maskuj(err))
+        time.sleep(10)
+    return False
+
+
 os.makedirs(WYJ, exist_ok=True)
 poprzednia = os.path.join(WYJ, "poprzednia.json")
-kod, _, _ = sh(["git", "fetch", "--depth=1", "origin", "dane"])
-zapisano = False
-if kod == 0:
-    kod, out, _ = sh(["git", "show", "FETCH_HEAD:historia_ruchu.json"])
-    if kod == 0 and out.strip().startswith("{"):
-        with open(poprzednia, "w", encoding="utf-8") as f:
-            f.write(out)
-        zapisano = True
-if not zapisano:
+wynik = pobierz_poprzednia(poprzednia)
+if wynik is False:
+    sys.exit("Nie mozna pobrac poprzedniej historii - przerywam, aby jej nie nadpisac.")
+if wynik is None:
     with open(poprzednia, "w", encoding="utf-8") as f:
         f.write("{}")
-    print("Brak poprzedniej historii na galezi dane - zaczynam od nowa.")
+    print("Zaczynam nowa historie.")
 
 udane, proby = 0, 0
 while True:
