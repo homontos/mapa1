@@ -2,7 +2,7 @@ name: Historia ruchu
 
 on:
   schedule:
-    - cron: "3 * * * *"
+    - cron: "3,33 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,13 +15,13 @@ concurrency:
 jobs:
   zapisz:
     runs-on: ubuntu-latest
-    timeout-minutes: 58
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Petla zapisow co 5 minut (ok. 50 minut)
+      - name: Petla zapisow co 5 minut (ok. 25 minut)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python petla_historii.py
