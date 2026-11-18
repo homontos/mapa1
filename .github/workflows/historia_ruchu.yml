@@ -2,11 +2,12 @@ name: Historia ruchu
 
 on:
   schedule:
-    - cron: "3,33 * * * *"
+    - cron: "7 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: historia-ruchu
@@ -15,13 +16,18 @@ concurrency:
 jobs:
   zapisz:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 58
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Petla zapisow co 5 minut (ok. 25 minut)
+      - name: Petla zapisow co 5 minut (ok. 50 minut)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python petla_historii.py
+      - name: Uruchom kolejny przebieg (lancuch)
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run historia_ruchu.yml --ref "$GITHUB_REF_NAME" || echo "Nie udalo sie uruchomic kolejnego przebiegu"
