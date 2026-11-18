@@ -5,7 +5,7 @@ import sys
 import tempfile
 import time
 
-CZAS_PETLI_S = 50 * 60       # ile trwa jeden przebieg
+CZAS_PETLI_S = 27 * 60       # ile trwa jeden przebieg
 CO_S = 300                   # odstep miedzy zapisami
 repo = os.environ["GITHUB_REPOSITORY"]
 token = os.environ["GH_TOKEN"]
