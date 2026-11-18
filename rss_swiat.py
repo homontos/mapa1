@@ -3,10 +3,11 @@ import json
 import os
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 PLIK = "swiat.json"
@@ -24,8 +25,6 @@ KATEGORIE = ["rakieta", "dron", "starcie", "marynarka", "alarm", "inne"]
 MAKS_NOWYCH = 30
 DNI = 7
 KLUCZ = os.environ.get("GEMINI_API_KEY", "").strip()
-
-MODEL = "gemini-2.5-flash-lite"
 SLOWA = re.compile(
     r"missile|drone|uav|strike|attack|airstrike|military|army|navy|naval|warship|troops|shell|rocket|"
     r"offensive|ceasefire|fighter|submarine|artillery|houthi|hezbollah|hamas|idf|invasion|frigate|"
@@ -85,6 +84,30 @@ def czytaj(url):
     return wynik
 
 
+def lista_modeli():
+    wymuszony = os.environ.get("GEMINI_MODEL", "").strip()
+    if wymuszony:
+        return [wymuszony]
+    nazwy = []
+    try:
+        d = json.loads(pobierz("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=" + KLUCZ))
+        nazwy = [m["name"].split("/")[-1] for m in d.get("models", [])
+                 if "generateContent" in m.get("supportedGenerationMethods", [])]
+        print("Dostepnych modeli z generateContent:", len(nazwy))
+    except Exception as e:
+        print("Nie udalo sie pobrac listy modeli:", type(e).__name__, str(e)[:100])
+    zle = ("image", "tts", "audio", "live", "embedding", "vision", "robotics", "computer", "customtools")
+    flash = [n for n in nazwy if "flash" in n and not any(z in n for z in zle)]
+    pref = [n for n in ("gemini-flash-lite-latest", "gemini-flash-latest") if n in flash]
+    reszta = sorted([n for n in flash if n not in pref], reverse=True)
+    reszta.sort(key=lambda n: ("preview" in n or "exp" in n))
+    wynik = pref + reszta
+    if not wynik:
+        wynik = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+    print("Modele do proby:", wynik[:5])
+    return wynik[:5]
+
+
 def ai(pozycje):
     lista = [{"i": i, "tytul": p["tytul"], "opis": p["opis"]} for i, p in enumerate(pozycje)]
     prompt = (
@@ -97,13 +120,29 @@ def ai(pozycje):
         "bez cytowania}. Depesze: " + json.dumps(lista, ensure_ascii=False))
     ciało = json.dumps({"contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2}}).encode()
-    url = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=" + KLUCZ
-    odp = json.loads(pobierz(url, ciało, {"Content-Type": "application/json"}))
-    txt = odp["candidates"][0]["content"]["parts"][0]["text"]
-    dane = json.loads(txt)
-    if isinstance(dane, dict):
-        dane = next((v for v in dane.values() if isinstance(v, list)), [])
-    return dane
+    ostatni = None
+    for model in lista_modeli():
+        url = ("https://generativelanguage.googleapis.com/v1beta/models/" + model +
+               ":generateContent?key=" + KLUCZ)
+        try:
+            odp = json.loads(pobierz(url, ciało, {"Content-Type": "application/json"}))
+            txt = odp["candidates"][0]["content"]["parts"][0]["text"]
+            dane = json.loads(txt)
+        except urllib.error.HTTPError as e:
+            print("Model", model, "- blad HTTP", e.code)
+            ostatni = e
+            if e.code in (401, 403):
+                break
+            continue
+        except Exception as e:
+            print("Model", model, "- blad:", type(e).__name__, str(e)[:100])
+            ostatni = e
+            continue
+        print("Uzyto modelu:", model)
+        if isinstance(dane, dict):
+            dane = next((v for v in dane.values() if isinstance(v, list)), [])
+        return dane
+    raise ostatni or RuntimeError("Brak dzialajacego modelu")
 
 
 def geokoduj(miejsce, cache):
@@ -170,6 +209,7 @@ if kandydaci:
         print("Blad AI:", type(e).__name__, str(e)[:200])
         if not stare:
             raise SystemExit("Brak danych")
+
 granica = int(time.time()) - DNI * 86400
 wszystkie = sorted([z for z in stare + nowe if z["t"] >= granica], key=lambda z: -z["t"])
 with open(PLIK, "w", encoding="utf-8") as f:
