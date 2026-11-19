@@ -8,7 +8,6 @@
   var NAZWY = { uav: "Dron (BpLA)", recon: "Dron rozpoznawczy", missile: "Rakieta",
     ballistic: "Rakieta balistyczna", kab: "Bomba kierowana (KAB)", mig31k: "MiG-31K",
     unknown: "Obiekt nierozpoznany" };
-  // [wzorzec w opisie, id zdjecia, nazwa, krotki opis]
   var MODELE = [
     [/шахед|shahed|герань|geran/i, "shahed", "Shahed-136 / Geran-2", "Dron-kamikadze dalekiego zasięgu, konstrukcji irańskiej (w Rosji Geran-2)."],
     [/орлан|orlan/i, "orlan", "Orlan-10", "Rosyjski dron rozpoznawczy."],
@@ -34,11 +33,12 @@
     "Полтавська": "połtawski", "Рівненська": "rówieński", "Сумська": "sumski", "Тернопільська": "tarnopolski",
     "Харківська": "charkowski", "Херсонська": "chersoński", "Хмельницька": "chmielnicki", "Черкаська": "czerkaski",
     "Чернівецька": "czerniowiecki", "Чернігівська": "czernihowski" };
-  var LIT = { а: "a", б: "b", в: "w", г: "h", ґ: "g", д: "d", е: "e", є: "je", ж: "ż", з: "z", и: "y", і: "i",
-    ї: "ji", й: "j", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
-    х: "ch", ц: "c", ч: "cz", ш: "sz", щ: "szcz", ь: "", ю: "ju", я: "ja", "’": "", "ʼ": "", "'": "" };
+  var LIT = { "а": "a", "б": "b", "в": "w", "г": "h", "ґ": "g", "д": "d", "е": "e", "є": "je", "ж": "ż",
+    "з": "z", "и": "y", "і": "i", "ї": "ji", "й": "j", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o",
+    "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f", "х": "ch", "ц": "c", "ч": "cz", "ш": "sz",
+    "щ": "szcz", "ь": "", "ю": "ju", "я": "ja", "’": "", "ʼ": "", "'": "" };
   var SLOWA = [[/БпЛА/g, "dron"], [/курсом на/g, "kursem na"], [/Підтверджень/g, "Potwierdzeń"],
-    [/район/g, "rejon"], [/область/g, "obwód"], [/м\./g, "m."]];
+    [/район/g, "rejon"], [/область/g, "obwód"]];
   var TL = {}, slady = {}, BIB = {};
   var widoczne = true;
 
@@ -47,7 +47,7 @@
     return s.replace(/[А-Яа-яІіЇїЄєҐґ’ʼ']+/g, function (w) {
       var out = "";
       for (var i = 0; i < w.length; i++) {
-        var c = w[i], m = LIT[c.toLowerCase()];
+        var c = w.charAt(i), m = LIT[c.toLowerCase()];
         if (m === undefined) { out += c; continue; }
         if (c !== c.toLowerCase() && m.length) m = m.charAt(0).toUpperCase() + m.slice(1);
         out += m;
@@ -66,14 +66,16 @@
     if (/Крим/.test(s)) return "Krym";
     if (/Севастополь/.test(s)) return "Sewastopol";
     if (/^(м\.\s*)?Київ$/.test(s)) return "Kijów";
-    for (var k in OBL) { if (s.indexOf(k) === 0 && /область/.test(s)) return "obwód " + OBL[k]; }
+    for (var k in OBL) {
+      if (s.indexOf(k) === 0 && /область/.test(s)) return "obwód " + OBL[k];
+    }
     return frazaLokalna(s);
   }
   function pl(oryg, miejsce) {
     oryg = String(oryg || "").trim();
     if (!/[А-Яа-яІіЇїЄєҐґ]/.test(oryg)) return oryg;
-    if (miejsce) { var m = miejsceLokalnie(oryg); if (m) return TL[oryg] || m; }
-    return TL[oryg] || frazaLokalna(oryg);
+    if (TL[oryg]) return TL[oryg];
+    return miejsce ? miejsceLokalnie(oryg) : frazaLokalna(oryg);
   }
   function wczytajTL() {
     fetch("tlumaczenia.json?t=" + Math.floor(Date.now() / 60000))
@@ -100,7 +102,8 @@
       return;
     }
     var img = document.createElement("img");
-    img.src = "drony/" + z.plik; img.alt = z.tytul;
+    img.src = "drony/" + z.plik;
+    img.alt = z.tytul;
     img.style.cssText = "width:100%;border-radius:4px;margin:4px 0 0";
     kontener.appendChild(img);
     var c = document.createElement("div");
@@ -121,12 +124,14 @@
   // ---------- Tory lotu ----------
   function km(a, b) {
     var R = 6371, r = Math.PI / 180, dl = (b[1] - a[1]) * r, dn = (b[0] - a[0]) * r;
-    var h = Math.pow(Math.sin(dl / 2), 2) + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.pow(Math.sin(dn / 2), 2);
+    var h = Math.pow(Math.sin(dl / 2), 2) +
+      Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.pow(Math.sin(dn / 2), 2);
     return 2 * R * Math.asin(Math.sqrt(h));
   }
   function dodajPunkt(id, typ, lon, lat, t) {
     var s = slady[id] || (slady[id] = { typ: typ, pkt: [], brak: 0 });
-    s.brak = 0; s.typ = typ;
+    s.brak = 0;
+    s.typ = typ;
     var ost = s.pkt[s.pkt.length - 1];
     if (!ost || km(ost, [lon, lat]) > 0.3) s.pkt.push([lon, lat, t]);
   }
@@ -135,7 +140,8 @@
 
   function dodaj() {
     if (map.getSource("neptun-slad")) return;
-    var przed = map.getLayer("neptun-punkt") ? "neptun-punkt" : (map.getLayer("statki-postoj") ? "statki-postoj" : undefined);
+    var przed = map.getLayer("neptun-punkt") ? "neptun-punkt"
+      : (map.getLayer("statki-postoj") ? "statki-postoj" : undefined);
     var wid = widoczne ? "visible" : "none";
     map.addSource("neptun-slad", { type: "geojson", data: daneSlad });
     map.addSource("neptun-start", { type: "geojson", data: daneStart });
@@ -184,7 +190,10 @@
           dodajPunkt(id, t.type || "unknown", t.lon, t.lat, teraz);
         });
         Object.keys(slady).forEach(function (id) {
-          if (!obecne[id] && ++slady[id].brak >= 2) delete slady[id];
+          if (!obecne[id]) {
+            slady[id].brak++;
+            if (slady[id].brak >= 2) delete slady[id];
+          }
         });
         rysujSlady();
       })
@@ -200,15 +209,20 @@
       });
     })
     .catch(function () {})
-    .then(function () { odswiez(); setInterval(odswiez, 20000); });
+    .then(function () {
+      odswiez();
+      setInterval(odswiez, 20000);
+    });
 
   // ---------- Szczegoly obiektu ----------
-    function szczegoly(cechy) {
+  function szczegoly(cechy) {
     var p = cechy[0].properties;
     var typ = p.type || "unknown";
     var tekstModelu = (p.title || "") + " " + (p.opis || "");
     var model = null;
-    for (var i = 0; i < MODELE.length; i++) { if (MODELE[i][0].test(tekstModelu)) { model = MODELE[i]; break; } }
+    for (var i = 0; i < MODELE.length; i++) {
+      if (MODELE[i][0].test(tekstModelu)) { model = MODELE[i]; break; }
+    }
 
     var box = document.createElement("div");
     function w(t, styl) {
@@ -222,8 +236,12 @@
     w((NAZWY[typ] || NAZWY.unknown) + (model ? " – " + model[2] : " (model nieustalony)"), "font-weight:bold");
     var fotoBox = document.createElement("div");
     box.appendChild(fotoBox);
-    if (model) { w(model[3], "font-size:13px"); zdjecie(model[1], fotoBox); }
-    else w("Model nie został podany w opisie, więc nie pokazuję zdjęcia.", "font-size:12px;color:#777");
+    if (model) {
+      w(model[3], "font-size:13px");
+      zdjecie(model[1], fotoBox);
+    } else {
+      w("Model nie został podany w opisie, więc nie pokazuję zdjęcia.", "font-size:12px;color:#777");
+    }
 
     var cz = [p.locality, p.district, p.region].filter(function (x) { return x; })
       .map(function (x) { return pl(x, true); });
@@ -231,7 +249,9 @@
     if (p.title) w("Opis (tłumaczenie automatyczne): " + pl(p.title, false));
     if (p.opis && p.opis !== p.title) w(pl(p.opis, false));
     if (p.count > 0) w("Liczba obiektów: " + p.count);
-    if (p.heading !== undefined && p.heading !== null && p.heading !== "") w("Kurs: " + Math.round(p.heading) + "°");
+    if (p.heading !== undefined && p.heading !== null && p.heading !== "") {
+      w("Kurs: " + Math.round(p.heading) + "°");
+    }
     if (p.speed) w("Prędkość: ok. " + Math.round(p.speed) + " km/h");
     var POW = { low: "niska", medium: "średnia", high: "wysoka" };
     w("Pewność: " + (POW[p.confidence] || "nieznana") + (p.sources ? " (źródeł: " + p.sources + ")" : ""));
@@ -240,28 +260,36 @@
     if (sl && sl.pkt.length > 1) {
       var dd = 0;
       for (var j = 1; j < sl.pkt.length; j++) dd += km(sl.pkt[j - 1], sl.pkt[j]);
-      w("Tor lotu: od " + new Date(sl.pkt[0][2]).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) +
+      w("Tor lotu: od " +
+        new Date(sl.pkt[0][2]).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) +
         ", przebyte ok. " + Math.round(dd) + " km (linia zniknie, gdy obiekt zniknie z NEPTUN).");
     }
-    w("Nieoficjalny agregator doniesień. Pozycje szacunkowe i bywają spóźnione. Rodzaj obiektu ustalono z opisu źródła, " +
-      "zdjęcie jest poglądowe. Nie zastępuje syren ani Alertu RCB.", "font-size:11px;color:#666;margin-top:8px");
+    w("Nieoficjalny agregator doniesień. Pozycje szacunkowe i bywają spóźnione. Rodzaj obiektu ustalono z opisu " +
+      "źródła, zdjęcie jest poglądowe. Nie zastępuje syren ani Alertu RCB.",
+      "font-size:11px;color:#666;margin-top:8px");
     var a = document.createElement("a");
-    a.href = "https://neptun.in.ua/"; a.target = "_blank"; a.rel = "noopener";
-    a.textContent = "Dane: NEPTUN"; a.style.fontSize = "11px";
+    a.href = "https://neptun.in.ua/";
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = "Dane: NEPTUN";
+    a.style.fontSize = "11px";
     box.appendChild(a);
-    if (window.pokazSzczegoly) window.pokazSzczegoly((NAZWY[typ] || "Obiekt") + (model ? " " + model[2] : ""), box);
+    if (window.pokazSzczegoly) {
+      window.pokazSzczegoly((NAZWY[typ] || "Obiekt") + (model ? " " + model[2] : ""), box);
+    }
   }
-  // Opoznienie, aby ten panel zawsze byl ostatni (po starym z neptun.js)
   ["neptun-punkt", "neptun-ruch"].forEach(function (id) {
-        map.on("click", id, function (e) {
+    map.on("click", id, function (e) {
       var cechy = e.features;
       setTimeout(function () { szczegoly(cechy); }, 60);
     });
+  });
 
   // ---------- Legenda ----------
   var tresc = document.querySelector("#legenda .p-tresc") || document.getElementById("legenda");
   var blok = document.createElement("div");
-  blok.innerHTML = '<label style="font-size:12px"><input type="checkbox" id="np-slad" checked> Tory lotu dronów i rakiet</label>';
+  blok.innerHTML = '<label style="font-size:12px"><input type="checkbox" id="np-slad" checked> ' +
+    'Tory lotu dronów i rakiet</label>';
   tresc.appendChild(blok);
   document.getElementById("np-slad").addEventListener("change", function () {
     widoczne = this.checked;
