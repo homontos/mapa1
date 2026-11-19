@@ -8,30 +8,73 @@
   var NAZWY = { uav: "Dron (BpLA)", recon: "Dron rozpoznawczy", missile: "Rakieta",
     ballistic: "Rakieta balistyczna", kab: "Bomba kierowana (KAB)", mig31k: "MiG-31K",
     unknown: "Obiekt nierozpoznany" };
-  // [wzorzec w opisie, nazwa, zapytanie do Wikipedii, krotki opis]
+  // [wzorzec w opisie, id zdjecia, nazwa, krotki opis]
   var MODELE = [
-    [/шахед|shahed|герань|geran/i, "Shahed-136 / Geran-2", "HESA Shahed 136",
-      "Dron-kamikadze dalekiego zasięgu, konstrukcji irańskiej (w Rosji używany jako Geran-2)."],
-    [/орлан|orlan/i, "Orlan-10", "Orlan-10", "Rosyjski dron rozpoznawczy."],
-    [/ланцет|lancet/i, "Lancet", "ZALA Lancet", "Rosyjski dron uderzeniowy (amunicja krążąca)."],
-    [/гербер|gerber/i, "Gerbera", "Gerbera drone Russia", "Rosyjski dron-wabik, używany do zmylenia obrony."],
-    [/іскандер|iskander/i, "Iskander", "9K720 Iskander", "Rosyjski pocisk balistyczny krótkiego zasięgu."],
-    [/калібр|kalibr/i, "Kalibr", "3M-54 Kalibr", "Rosyjski pocisk manewrujący odpalany z okrętów i okrętów podwodnych."],
-    [/х-?101|kh-?101/i, "Ch-101", "Kh-101", "Rosyjski pocisk manewrujący odpalany z samolotów."],
-    [/кинджал|kinzhal|х-?47/i, "Kindżał (Ch-47M2)", "Kh-47M2 Kinzhal", "Rosyjski pocisk aerobalistyczny."],
-    [/циркон|zircon|tsirkon/i, "Cyrkon", "3M22 Zircon", "Rosyjski pocisk hipersoniczny."],
-    [/х-?22|kh-?22/i, "Ch-22", "Kh-22", "Rosyjski ciężki pocisk przeciwokrętowy."],
-    [/х-?59|kh-?59/i, "Ch-59", "Kh-59", "Rosyjski pocisk manewrujący."],
-    [/х-?55|kh-?55/i, "Ch-55", "Kh-55", "Rosyjski pocisk manewrujący."],
-    [/міг-?31|mig-?31/i, "MiG-31K", "Mikoyan MiG-31", "Rosyjski myśliwiec przechwytujący, nosiciel pocisku Kindżał."],
-    [/ту-?95|tu-?95/i, "Tu-95", "Tupolev Tu-95", "Rosyjski strategiczny bombowiec."],
-    [/ту-?160|tu-?160/i, "Tu-160", "Tupolev Tu-160", "Rosyjski strategiczny bombowiec."],
-    [/ту-?22|tu-?22/i, "Tu-22M3", "Tupolev Tu-22M", "Rosyjski bombowiec dalekiego zasięgu."]
+    [/шахед|shahed|герань|geran/i, "shahed", "Shahed-136 / Geran-2", "Dron-kamikadze dalekiego zasięgu, konstrukcji irańskiej (w Rosji Geran-2)."],
+    [/орлан|orlan/i, "orlan", "Orlan-10", "Rosyjski dron rozpoznawczy."],
+    [/ланцет|lancet/i, "lancet", "Lancet", "Rosyjski dron uderzeniowy (amunicja krążąca)."],
+    [/гербер|gerber/i, "gerbera", "Gerbera", "Rosyjski dron-wabik do zmylenia obrony."],
+    [/іскандер|iskander/i, "iskander", "Iskander", "Rosyjski pocisk balistyczny krótkiego zasięgu."],
+    [/калібр|kalibr/i, "kalibr", "Kalibr", "Rosyjski pocisk manewrujący z okrętów."],
+    [/х-?101|kh-?101/i, "kh101", "Ch-101", "Rosyjski pocisk manewrujący z samolotów."],
+    [/кинджал|kinzhal|х-?47/i, "kinzhal", "Kindżał (Ch-47M2)", "Rosyjski pocisk aerobalistyczny."],
+    [/циркон|zircon|tsirkon/i, "zircon", "Cyrkon", "Rosyjski pocisk hipersoniczny."],
+    [/х-?22|kh-?22/i, "kh22", "Ch-22", "Rosyjski ciężki pocisk przeciwokrętowy."],
+    [/х-?59|kh-?59/i, "kh59", "Ch-59", "Rosyjski pocisk manewrujący."],
+    [/х-?55|kh-?55/i, "kh55", "Ch-55", "Rosyjski pocisk manewrujący."],
+    [/міг-?31|mig-?31/i, "mig31", "MiG-31K", "Rosyjski myśliwiec przechwytujący, nosiciel pocisku Kindżał."],
+    [/ту-?95|tu-?95/i, "tu95", "Tu-95", "Rosyjski strategiczny bombowiec."],
+    [/ту-?160|tu-?160/i, "tu160", "Tu-160", "Rosyjski strategiczny bombowiec."],
+    [/ту-?22|tu-?22/i, "tu22", "Tu-22M3", "Rosyjski bombowiec dalekiego zasięgu."]
   ];
-  var TL = {}, slady = {}, wiki = {}, lokalne = {};
+  var OBL = { "Вінницька": "winnicki", "Волинська": "wołyński", "Дніпропетровська": "dniepropietrowski",
+    "Донецька": "doniecki", "Житомирська": "żytomierski", "Закарпатська": "zakarpacki", "Запорізька": "zaporoski",
+    "Івано-Франківська": "iwanofrankiwski", "Київська": "kijowski", "Кіровоградська": "kirowohradzki",
+    "Луганська": "ługański", "Львівська": "lwowski", "Миколаївська": "mikołajowski", "Одеська": "odeski",
+    "Полтавська": "połtawski", "Рівненська": "rówieński", "Сумська": "sumski", "Тернопільська": "tarnopolski",
+    "Харківська": "charkowski", "Херсонська": "chersoński", "Хмельницька": "chmielnicki", "Черкаська": "czerkaski",
+    "Чернівецька": "czerniowiecki", "Чернігівська": "czernihowski" };
+  var LIT = { а: "a", б: "b", в: "w", г: "h", ґ: "g", д: "d", е: "e", є: "je", ж: "ż", з: "z", и: "y", і: "i",
+    ї: "ji", й: "j", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+    х: "ch", ц: "c", ч: "cz", ш: "sz", щ: "szcz", ь: "", ю: "ju", я: "ja", "’": "", "ʼ": "", "'": "" };
+  var SLOWA = [[/БпЛА/g, "dron"], [/курсом на/g, "kursem na"], [/Підтверджень/g, "Potwierdzeń"],
+    [/район/g, "rejon"], [/область/g, "obwód"], [/м\./g, "m."]];
+  var TL = {}, slady = {}, BIB = {};
   var widoczne = true;
 
-  // ---------- Tlumaczenia ----------
+  // ---------- Tlumaczenie ----------
+  function translit(s) {
+    return s.replace(/[А-Яа-яІіЇїЄєҐґ’ʼ']+/g, function (w) {
+      var out = "";
+      for (var i = 0; i < w.length; i++) {
+        var c = w[i], m = LIT[c.toLowerCase()];
+        if (m === undefined) { out += c; continue; }
+        if (c !== c.toLowerCase() && m.length) m = m.charAt(0).toUpperCase() + m.slice(1);
+        out += m;
+      }
+      return out;
+    });
+  }
+  function frazaLokalna(s) {
+    var t = s;
+    SLOWA.forEach(function (p) { t = t.replace(p[0], p[1]); });
+    t = translit(t);
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function miejsceLokalnie(s) {
+    s = String(s || "").trim();
+    if (/Крим/.test(s)) return "Krym";
+    if (/Севастополь/.test(s)) return "Sewastopol";
+    if (/^(м\.\s*)?Київ$/.test(s)) return "Kijów";
+    for (var k in OBL) { if (s.indexOf(k) === 0 && /область/.test(s)) return "obwód " + OBL[k]; }
+    return frazaLokalna(s);
+  }
+  function pl(oryg, miejsce) {
+    oryg = String(oryg || "").trim();
+    if (!/[А-Яа-яІіЇїЄєҐґ]/.test(oryg)) return oryg;
+    if (miejsce) { var m = miejsceLokalnie(oryg); if (m) return TL[oryg] || m; }
+    return TL[oryg] || frazaLokalna(oryg);
+  }
   function wczytajTL() {
     fetch("tlumaczenia.json?t=" + Math.floor(Date.now() / 60000))
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
@@ -41,49 +84,38 @@
   wczytajTL();
   setInterval(wczytajTL, 5 * 60 * 1000);
 
-  function wstawTekst(el, oryg) {
-    oryg = String(oryg || "").trim();
-    var pl = TL[oryg] || lokalne[oryg];
-    if (pl) { el.textContent = pl; return; }
-    if (!/[А-Яа-яІіЇїЄєҐґ]/.test(oryg)) { el.textContent = oryg; return; }
-    el.textContent = oryg + " (tłumaczę…)";
-    fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(oryg.slice(0, 400)) + "&langpair=uk|pl")
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var t = d && d.responseData && d.responseData.translatedText;
-        if (t) { lokalne[oryg] = t; el.textContent = t + " (tłumaczenie automatyczne)"; }
-        else el.textContent = oryg + " (oryginał)";
-      })
-      .catch(function () { el.textContent = oryg + " (oryginał)"; });
-  }
+  // ---------- Biblioteka zdjec (folder drony/) ----------
+  fetch("drony/index.json?t=" + Math.floor(Date.now() / 600000))
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (d) { BIB = d.modele || {}; })
+    .catch(function () {});
 
-  // ---------- Zdjecia z Wikipedii ----------
-  function foto(zapytanie, kontener) {
-    function wstaw(d) {
-      if (!d || !d.src) return;
-      var img = document.createElement("img");
-      img.src = d.src; img.alt = d.tytul;
-      img.style.cssText = "width:100%;border-radius:4px;margin:4px 0 0";
-      kontener.appendChild(img);
-      var a = document.createElement("a");
-      a.textContent = "Zdjęcie poglądowe: Wikipedia – " + d.tytul;
-      a.href = d.url; a.target = "_blank"; a.rel = "noopener";
-      a.style.cssText = "display:block;font-size:11px;margin-bottom:4px";
-      kontener.appendChild(a);
+  function zdjecie(id, kontener) {
+    var z = BIB[id];
+    if (!z) {
+      var b = document.createElement("div");
+      b.style.cssText = "font-size:11px;color:#777;margin:4px 0";
+      b.textContent = "Brak zdjęcia tego modelu w bibliotece.";
+      kontener.appendChild(b);
+      return;
     }
-    if (wiki[zapytanie] !== undefined) { wstaw(wiki[zapytanie]); return; }
-    fetch("https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search" +
-      "&gsrlimit=1&prop=pageimages|info&piprop=thumbnail&pithumbsize=320&inprop=url&gsrsearch=" +
-      encodeURIComponent(zapytanie))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var st = d.query && d.query.pages, p = st && st[Object.keys(st)[0]];
-        var wynik = p && p.thumbnail && String(p.thumbnail.source).indexOf("https://") === 0
-          ? { src: p.thumbnail.source, tytul: p.title, url: p.fullurl } : null;
-        wiki[zapytanie] = wynik;
-        wstaw(wynik);
-      })
-      .catch(function () { wiki[zapytanie] = null; });
+    var img = document.createElement("img");
+    img.src = "drony/" + z.plik; img.alt = z.tytul;
+    img.style.cssText = "width:100%;border-radius:4px;margin:4px 0 0";
+    kontener.appendChild(img);
+    var c = document.createElement("div");
+    c.style.cssText = "font-size:11px;color:#555;margin-bottom:4px";
+    c.appendChild(document.createTextNode("Zdjęcie poglądowe: " + z.autor + ", "));
+    var l = document.createElement("a");
+    l.textContent = z.licencja;
+    if (/^https?:\/\//.test(z.licurl || "")) { l.href = z.licurl; l.target = "_blank"; l.rel = "noopener"; }
+    c.appendChild(l);
+    c.appendChild(document.createTextNode(", "));
+    var s = document.createElement("a");
+    s.textContent = "źródło (Wikimedia Commons)";
+    if (/^https?:\/\//.test(z.zrodlo || "")) { s.href = z.zrodlo; s.target = "_blank"; s.rel = "noopener"; }
+    c.appendChild(s);
+    kontener.appendChild(c);
   }
 
   // ---------- Tory lotu ----------
@@ -117,7 +149,8 @@
   if (map.isStyleLoaded()) dodaj();
 
   function rysujSlady() {
-    var odtwarzanie = document.getElementById("h-suwak") && +document.getElementById("h-suwak").value !== 0;
+    var sw = document.getElementById("h-suwak");
+    var odtwarzanie = sw && +sw.value !== 0;
     var c = [], s = [];
     if (!odtwarzanie) {
       Object.keys(slady).forEach(function (id) {
@@ -157,8 +190,6 @@
       })
       .catch(function () {});
   }
-
-  // Poczatkowe tory z zapisanej historii, potem dopisywanie na zywo
   fetch(BAZA + "historia_ruchu.json?t=" + Math.floor(Date.now() / 60000))
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function (h) {
@@ -188,44 +219,42 @@
       box.appendChild(d);
       return d;
     }
-    w((NAZWY[typ] || NAZWY.unknown) + (model ? " – " + model[1] : " (model nieustalony)"), "font-weight:bold");
+    w((NAZWY[typ] || NAZWY.unknown) + (model ? " – " + model[2] : " (model nieustalony)"), "font-weight:bold");
     var fotoBox = document.createElement("div");
     box.appendChild(fotoBox);
-    if (model) { w(model[3], "font-size:13px"); foto(model[2], fotoBox); }
+    if (model) { w(model[3], "font-size:13px"); zdjecie(model[1], fotoBox); }
     else w("Model nie został podany w opisie, więc nie pokazuję zdjęcia.", "font-size:12px;color:#777");
 
-    if (p.title) { var d1 = w("", "margin-top:8px"); wstawTekst(d1, p.title); }
-    if (p.opis && p.opis !== p.title) { var d2 = w(""); wstawTekst(d2, p.opis); }
-    var miejsce = document.createElement("div");
-    miejsce.style.margin = "4px 0";
-    box.appendChild(miejsce);
-    var cz = [p.locality, p.district, p.region].filter(function (x) { return x; });
-    var lab = document.createElement("span"); lab.textContent = "Miejsce: "; miejsce.appendChild(lab);
-    cz.forEach(function (x, i) {
-      var s = document.createElement("span");
-      miejsce.appendChild(s);
-      wstawTekst(s, x);
-      if (i < cz.length - 1) miejsce.appendChild(document.createTextNode(", "));
-    });
+    var cz = [p.locality, p.district, p.region].filter(function (x) { return x; })
+      .map(function (x) { return pl(x, true); });
+    if (cz.length) w("Miejsce: " + cz.join(", "), "margin-top:8px");
+    if (p.title) w("Opis (tłumaczenie automatyczne): " + pl(p.title, false));
+    if (p.opis && p.opis !== p.title) w(pl(p.opis, false));
     if (p.count > 0) w("Liczba obiektów: " + p.count);
     if (p.heading !== undefined && p.heading !== null && p.heading !== "") w("Kurs: " + Math.round(p.heading) + "°");
     if (p.speed) w("Prędkość: ok. " + Math.round(p.speed) + " km/h");
+    var POW = { low: "niska", medium: "średnia", high: "wysoka" };
+    w("Pewność: " + (POW[p.confidence] || "nieznana") + (p.sources ? " (źródeł: " + p.sources + ")" : ""));
+    if (p.uncertainty > 0) w("Pozycja przybliżona (±" + p.uncertainty + " km)");
     var sl = slady[String(p.id)];
     if (sl && sl.pkt.length > 1) {
-      var d = 0;
-      for (var j = 1; j < sl.pkt.length; j++) d += km(sl.pkt[j - 1], sl.pkt[j]);
+      var dd = 0;
+      for (var j = 1; j < sl.pkt.length; j++) dd += km(sl.pkt[j - 1], sl.pkt[j]);
       w("Tor lotu: od " + new Date(sl.pkt[0][2]).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) +
-        ", przebyte ok. " + Math.round(d) + " km (linia na mapie zniknie, gdy obiekt zniknie z NEPTUN).");
+        ", przebyte ok. " + Math.round(dd) + " km (linia zniknie, gdy obiekt zniknie z NEPTUN).");
     }
-    w("Nieoficjalny agregator doniesień. Pozycje szacunkowe i bywają spóźnione. Rodzaj obiektu ustalono na podstawie " +
-      "opisu źródła, zdjęcie jest poglądowe. Nie zastępuje syren ani Alertu RCB.", "font-size:11px;color:#666;margin-top:8px");
+    w("Nieoficjalny agregator doniesień. Pozycje szacunkowe i bywają spóźnione. Rodzaj obiektu ustalono z opisu źródła, " +
+      "zdjęcie jest poglądowe. Nie zastępuje syren ani Alertu RCB.", "font-size:11px;color:#666;margin-top:8px");
     var a = document.createElement("a");
     a.href = "https://neptun.in.ua/"; a.target = "_blank"; a.rel = "noopener";
     a.textContent = "Dane: NEPTUN"; a.style.fontSize = "11px";
     box.appendChild(a);
-    if (window.pokazSzczegoly) window.pokazSzczegoly((NAZWY[typ] || "Obiekt") + (model ? " " + model[1] : ""), box);
+    if (window.pokazSzczegoly) window.pokazSzczegoly((NAZWY[typ] || "Obiekt") + (model ? " " + model[2] : ""), box);
   }
-  ["neptun-punkt", "neptun-ruch"].forEach(function (id) { map.on("click", id, szczegoly); });
+  // Opoznienie, aby ten panel zawsze byl ostatni (po starym z neptun.js)
+  ["neptun-punkt", "neptun-ruch"].forEach(function (id) {
+    map.on("click", id, function (e) { setTimeout(function () { szczegoly(e); }, 60); });
+  });
 
   // ---------- Legenda ----------
   var tresc = document.querySelector("#legenda .p-tresc") || document.getElementById("legenda");
