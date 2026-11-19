@@ -203,8 +203,8 @@
     .then(function () { odswiez(); setInterval(odswiez, 20000); });
 
   // ---------- Szczegoly obiektu ----------
-  function szczegoly(e) {
-    var p = e.features[0].properties;
+    function szczegoly(cechy) {
+    var p = cechy[0].properties;
     var typ = p.type || "unknown";
     var tekstModelu = (p.title || "") + " " + (p.opis || "");
     var model = null;
@@ -253,8 +253,10 @@
   }
   // Opoznienie, aby ten panel zawsze byl ostatni (po starym z neptun.js)
   ["neptun-punkt", "neptun-ruch"].forEach(function (id) {
-    map.on("click", id, function (e) { setTimeout(function () { szczegoly(e); }, 60); });
-  });
+        map.on("click", id, function (e) {
+      var cechy = e.features;
+      setTimeout(function () { szczegoly(cechy); }, 60);
+    });
 
   // ---------- Legenda ----------
   var tresc = document.querySelector("#legenda .p-tresc") || document.getElementById("legenda");
