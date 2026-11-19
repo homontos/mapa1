@@ -19,6 +19,7 @@ KANALY = [
     "https://www.jpost.com/rss/rssfeedsfrontpage.aspx",
     "https://www.twz.com/feed",
     "http://feeds.bbci.co.uk/news/world/rss.xml",
+    "https://baltic-monitor.com",
 ]
 REGIONY = ["Europa Wschodnia", "Bliski Wschód", "Azja i Pacyfik", "Afryka", "Ameryki"]
 KATEGORIE = ["rakieta", "dron", "starcie", "marynarka", "alarm", "inne"]
@@ -28,7 +29,8 @@ KLUCZ = os.environ.get("GEMINI_API_KEY", "").strip()
 SLOWA = re.compile(
     r"missile|drone|uav|strike|attack|airstrike|military|army|navy|naval|warship|troops|shell|rocket|"
     r"offensive|ceasefire|fighter|submarine|artillery|houthi|hezbollah|hamas|idf|invasion|frigate|"
-    r"destroyer|bomb|clash|battle|war\b|killed|soldier|defen[cs]e", re.I)
+    r"destroyer|bomb|clash|battle|war\b|killed|soldier|defen[cs]e",
+    r"wojsk|dron|rakiet|granic|ros|prowokacj|dywersj|okręt|armia|nato|eskalacj|obron", re.I)
 
 if not KLUCZ:
     raise SystemExit("Brak sekretu GEMINI_API_KEY")
@@ -119,7 +121,9 @@ def ai(pozycje):
         + json.dumps(REGIONY, ensure_ascii=False) + " (wybierz najbliższy), \"kraj\": nazwa kraju po polsku, "
         "\"kat\": jedna z " + json.dumps(KATEGORIE, ensure_ascii=False) + ", \"miejsce\": \"Miasto, Kraj\" po angielsku "
         "(do mapy), \"tekst\": krótkie, zwięzłe streszczenie po polsku w maksymalnie 2 zdaniach, własnymi słowami, "
-        "bez cytowania}. Depesze: " + json.dumps(lista, ensure_ascii=False))
+        "bez cytowania}. 
+        "Jeśli depesza jest przeglądem z Bałtyckiego Monitora, ustaw region na Europa Wschodnia, a miejsce na główny kraj bałtycki lub Polskę z opisu. "
+        Depesze: " + json.dumps(lista, ensure_ascii=False))
     ciało = json.dumps({"contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2}}).encode()
     ostatni = None
