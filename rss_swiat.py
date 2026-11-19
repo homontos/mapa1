@@ -114,22 +114,14 @@ def lista_modeli():
 
 def ai(pozycje):
     lista = [{"i": i, "tytul": p["tytul"], "opis": p["opis"]} for i, p in enumerate(pozycje)]
-    prompt = f"""(
-        "Dostajesz listę depesz prasowych. Dla każdej oceń, czy dotyczy działań militarnych "
-        "(atak, rakiety, drony, starcia, ruchy wojsk lub okrętów, alarmy). Zwróć TYLKO tablicę JSON, "
-        "po jednym obiekcie na depeszę: {\"i\": numer, \"wojsk\": true/false, \"region\": jeden z "
-        + json.dumps(REGIONY, ensure_ascii=False) + " (wybierz najbliższy), \"kraj\": nazwa kraju po polsku, "
-        "\"kat\": jedna z " + json.dumps(KATEGORIE, ensure_ascii=False) + ", \"miejsce\": \"Miasto, Kraj\" po angielsku "
-        "(do mapy), \"tekst\": krótkie, zwięzłe streszczenie po polsku w maksymalnie 2 zdaniach, własnymi słowami, "
-        "bez cytowania}. Jeśli depesza jest przeglądem z Bałtyckiego Monitora, ustaw region na Europa Wschodnia, a miejsce na główny kraj bałtycki lub Polskę z opisu. "
-        Depesze: " + json.dumps(lista, ensure_ascii=False))"""
+    prompt = f"""Dostajesz listę depesz prasowych. Dla każdej oceń, czy dotyczy działań militarnych (atak, rakiety, drony, starcia, ruchy wojsk lub okrętów, alarmy). Zwróć TYLKO tablicę JSON, po jednym obiekcie na depeszę: {{"i": numer, "wojsk": true/false, "region": jeden z {json.dumps(REGIONY, ensure_ascii=False)} (wybierz najbliższy), "kraj": nazwa kraju po polsku, "kat": jedna z {json.dumps(KATEGORIE, ensure_ascii=False)}, "miejsce": "Miasto, Kraj" po angielsku (do mapy), "tekst": krótkie, zwięzłe streszczenie po polsku w maksymalnie 2 zdaniach, własnymi słowami, bez cytowania}}. Jeśli depesza jest przeglądem z Bałtyckiego Monitora, ustaw region na Europa Wschodnia, a miejsce na główny kraj bałtycki lub Polskę z opisu. Depesze: {json.dumps(lista, ensure_ascii=False)}"""
     ciało = json.dumps({"contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2}}).encode()
     ostatni = None
     for idx, model in enumerate(lista_modeli()):
         if idx > 0:
-            time.sleep(4)  # Pauza przed próbą kolejnego modelu, aby uniknąć błędu 429
-        url = ("https://generativelanguage.googleapis.com/v1beta/models/" + model +
+            time.sleep(4)
+        url = ("https://googleapis.com" + model +
                ":generateContent?key=" + KLUCZ)
         try:
             odp = json.loads(pobierz(url, ciało, {"Content-Type": "application/json"}))
@@ -150,6 +142,7 @@ def ai(pozycje):
             dane = next((v for v in dane.values() if isinstance(v, list)), [])
         return dane
     raise ostatni or RuntimeError("Brak dzialajacego modelu")
+
 
 
 def geokoduj(miejsce, cache):
