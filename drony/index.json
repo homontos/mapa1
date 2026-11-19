@@ -1,0 +1,108 @@
+{
+ "modele": {
+  "shahed": {
+   "plik": "shahed.jpg",
+   "autor": "Idmental",
+   "licencja": "CC BY 4.0",
+   "licurl": "https://creativecommons.org/licenses/by/4.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Shahed_136_rendering.png",
+   "tytul": "File:Shahed 136 rendering.png"
+  },
+  "orlan": {
+   "plik": "orlan.jpg",
+   "autor": "Ministry of Defence of the Russian Federation",
+   "licencja": "CC BY 4.0",
+   "licurl": "https://creativecommons.org/licenses/by/4.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Orlan-10.jpg",
+   "tytul": "File:Orlan-10.jpg"
+  },
+  "gerbera": {
+   "plik": "gerbera.jpg",
+   "autor": "Jim Evans",
+   "licencja": "CC BY-SA 4.0",
+   "licurl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Gerbera_Daisy_--_Gerbera_Garvinea_%27Sweet_Glow%27.jpg",
+   "tytul": "File:Gerbera Daisy -- Gerbera Garvinea 'Sweet Glow'.jpg"
+  },
+  "iskander": {
+   "plik": "iskander.jpg",
+   "autor": "Алексей Ерешко (Alexey Yereshko)",
+   "licencja": "CC BY 4.0",
+   "licurl": "https://creativecommons.org/licenses/by/4.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Vostok2014-Day2-Iskander-M-06.jpg",
+   "tytul": "File:Vostok2014-Day2-Iskander-M-06.jpg"
+  },
+  "kalibr": {
+   "plik": "kalibr.jpg",
+   "autor": "No author (frame from a video surveillance camera)",
+   "licencja": "CC0",
+   "licurl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Kalibr_missile_strike_in_Kharkiv,_Ukraine.jpg",
+   "tytul": "File:Kalibr missile strike in Kharkiv, Ukraine.jpg"
+  },
+  "kinzhal": {
+   "plik": "kinzhal.jpg",
+   "autor": "Boevaya mashina",
+   "licencja": "CC BY-SA 3.0",
+   "licurl": "https://creativecommons.org/licenses/by-sa/3.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Kh-47M2_Kinzhal_Army-2022.jpg",
+   "tytul": "File:Kh-47M2 Kinzhal Army-2022.jpg"
+  },
+  "zircon": {
+   "plik": "zircon.jpg",
+   "autor": "Matti Blume",
+   "licencja": "CC BY-SA 4.0",
+   "licurl": "https://creativecommons.org/licenses/by-sa/4.0/deed.en",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Zircon_Tower,_Wiesbaden_(20260704-P1270096).jpg",
+   "tytul": "File:Zircon Tower, Wiesbaden (20260704-P1270096).jpg"
+  },
+  "kh22": {
+   "plik": "kh22.jpg",
+   "autor": "Антон Бородин",
+   "licencja": "CC BY-SA 3.0",
+   "licurl": "https://creativecommons.org/licenses/by-sa/3.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Raduga_Kh-22,_side_view.JPG",
+   "tytul": "File:Raduga Kh-22, side view.JPG"
+  },
+  "kh55": {
+   "plik": "kh55.jpg",
+   "autor": "George Chernilevsky",
+   "licencja": "Public domain",
+   "licurl": "",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Kh-55_AS-15_Kent_2016_G1.jpg",
+   "tytul": "File:Kh-55 AS-15 Kent 2016 G1.jpg"
+  },
+  "mig31": {
+   "plik": "mig31.jpg",
+   "autor": "Alexander Kopitar",
+   "licencja": "CC BY-SA 4.0",
+   "licurl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:MiG-31_Take_off.jpg",
+   "tytul": "File:MiG-31 Take off.jpg"
+  },
+  "tu95": {
+   "plik": "tu95.jpg",
+   "autor": "Роман Дергунов",
+   "licencja": "CC BY-SA 4.0",
+   "licurl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Tu-95_at_an_Air_show_in_Voronezh_2014.jpg",
+   "tytul": "File:Tu-95 at an Air show in Voronezh 2014.jpg"
+  },
+  "tu160": {
+   "plik": "tu160.jpg",
+   "autor": "Alex Beltyukov",
+   "licencja": "CC BY-SA 3.0",
+   "licurl": "https://creativecommons.org/licenses/by-sa/3.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Tupolev_Tu-160_overflying_Moscow_fix.jpg",
+   "tytul": "File:Tupolev Tu-160 overflying Moscow fix.jpg"
+  },
+  "tu22": {
+   "plik": "tu22.jpg",
+   "autor": "Photographer: Mosbatho",
+   "licencja": "CC BY 4.0",
+   "licurl": "https://creativecommons.org/licenses/by/4.0",
+   "zrodlo": "https://commons.wikimedia.org/wiki/File:Tupolev_Tu-22M1,_Riga_Aviation_Museum.jpg",
+   "tytul": "File:Tupolev Tu-22M1, Riga Aviation Museum.jpg"
+  }
+ }
+}
