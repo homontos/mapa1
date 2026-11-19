@@ -1,0 +1,22 @@
+name: Zdjecia dronow
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  zdjecia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python zdjecia_dronow.py
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add drony
+          git diff --cached --quiet || (git commit -m "Zdjecia dronow" && git push)
