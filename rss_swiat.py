@@ -114,7 +114,7 @@ def lista_modeli():
 
 def ai(pozycje):
     lista = [{"i": i, "tytul": p["tytul"], "opis": p["opis"]} for i, p in enumerate(pozycje)]
-    prompt = (
+    prompt = f"""(
         "Dostajesz listę depesz prasowych. Dla każdej oceń, czy dotyczy działań militarnych "
         "(atak, rakiety, drony, starcia, ruchy wojsk lub okrętów, alarmy). Zwróć TYLKO tablicę JSON, "
         "po jednym obiekcie na depeszę: {\"i\": numer, \"wojsk\": true/false, \"region\": jeden z "
@@ -122,7 +122,7 @@ def ai(pozycje):
         "\"kat\": jedna z " + json.dumps(KATEGORIE, ensure_ascii=False) + ", \"miejsce\": \"Miasto, Kraj\" po angielsku "
         "(do mapy), \"tekst\": krótkie, zwięzłe streszczenie po polsku w maksymalnie 2 zdaniach, własnymi słowami, "
         "bez cytowania}. Jeśli depesza jest przeglądem z Bałtyckiego Monitora, ustaw region na Europa Wschodnia, a miejsce na główny kraj bałtycki lub Polskę z opisu. "
-        Depesze: " + json.dumps(lista, ensure_ascii=False))
+        Depesze: " + json.dumps(lista, ensure_ascii=False))"""
     ciało = json.dumps({"contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2}}).encode()
     ostatni = None
