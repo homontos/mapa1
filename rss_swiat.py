@@ -19,7 +19,7 @@ KANALY = [
     "https://www.jpost.com/rss/rssfeedsfrontpage.aspx",
     "https://www.twz.com/feed",
     "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "https://baltic-monitor.com",
+        "https://baltic-monitor.com/rss.en.xml",
 ]
 REGIONY = ["Europa Wschodnia", "Bliski Wschód", "Azja i Pacyfik", "Afryka", "Ameryki"]
 KATEGORIE = ["rakieta", "dron", "starcie", "marynarka", "alarm", "inne"]
@@ -29,8 +29,9 @@ KLUCZ = os.environ.get("GEMINI_API_KEY", "").strip()
 SLOWA = re.compile(
     r"missile|drone|uav|strike|attack|airstrike|military|army|navy|naval|warship|troops|shell|rocket|"
     r"offensive|ceasefire|fighter|submarine|artillery|houthi|hezbollah|hamas|idf|invasion|frigate|"
-    r"destroyer|bomb|clash|battle|war\b|killed|soldier|defen[cs]e",
-    r"wojsk|dron|rakiet|granic|ros|prowokacj|dywersj|okręt|armia|nato|eskalacj|obron", re.I)
+    r"destroyer|bomb|clash|battle|war\b|killed|soldier|defen[cs]e|"
+    r"wojsk|dron|rakiet|granic|rosj|prowokacj|dywersj|okręt|armia|nato|eskalacj|obron",
+    re.I)
 
 if not KLUCZ:
     raise SystemExit("Brak sekretu GEMINI_API_KEY")
@@ -121,7 +122,7 @@ def ai(pozycje):
     for idx, model in enumerate(lista_modeli()):
         if idx > 0:
             time.sleep(4)
-        url = ("https://googleapis.com" + model +
+         url = ("https://generativelanguage.googleapis.com/v1beta/models/" + model +
                ":generateContent?key=" + KLUCZ)
         try:
             odp = json.loads(pobierz(url, ciało, {"Content-Type": "application/json"}))
@@ -183,7 +184,7 @@ for url in KANALY:
     print("Kanal", url.split("/")[2], "- artykulow:", len(pozycje))
     for p in pozycje[:25]:
         pid = hashlib.sha1(p["link"].encode()).hexdigest()[:10]
-        if p["link"] and pid not in znane and SLOWA.search(p["tytul"] + " " + p["opis"]):
+                if p["link"] and pid not in znane and (SLOWA.search(p["tytul"] + " " + p["opis"]) or "baltic-monitor" in p["z"]):
             p["id"] = pid
             kandydaci.append(p)
             znane.add(pid)
