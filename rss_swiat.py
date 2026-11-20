@@ -184,7 +184,7 @@ for url in KANALY:
     print("Kanal", url.split("/")[2], "- artykulow:", len(pozycje))
     for p in pozycje[:25]:
         pid = hashlib.sha1(p["link"].encode()).hexdigest()[:10]
-                if p["link"] and pid not in znane and (SLOWA.search(p["tytul"] + " " + p["opis"]) or "baltic-monitor" in p["z"]):
+    if p["link"] and pid not in znane and (SLOWA.search(p["tytul"] + " " + p["opis"]) or "baltic-monitor" in p["z"]):
             p["id"] = pid
             kandydaci.append(p)
             znane.add(pid)
