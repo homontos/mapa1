@@ -9,7 +9,7 @@ ZRODLA = [
     "https://opendata.adsb.fi/api/v2/mil",
 ]
 S, W, N, E = 33.0, -25.0, 72.0, 45.0      # Europa: poludnie, zachod, polnoc, wschod
-WIEK_S = 12 * 3600
+WIEK_S = 24 * 3600
 KAT = "dane_wyj"
 
 
