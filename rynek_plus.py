@@ -1,21 +1,20 @@
 import csv
 import io
 import json
-import re
 import urllib.request
-from datetime import datetime, timezone
-from urllib.parse import urljoin
+from datetime import datetime, timedelta, timezone
 
 PLIK = "rynek_plus.json"
-UA = "Mozilla/5.0 (mapa-rynek; prywatny projekt niekomercyjny)"
-STRONA_KE = "https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en"
+UA = "mapa-rynek/1.0 (prywatny projekt niekomercyjny)"
+UA_PRZEGLADARKA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
 
 
-def pobierz(url, bajty=False):
-    zad = urllib.request.Request(url, headers={"User-Agent": UA})
+def pobierz(url, ua=UA):
+    zad = urllib.request.Request(url, headers={
+        "User-Agent": ua, "Accept": "application/json,text/csv,*/*"})
     with urllib.request.urlopen(zad, timeout=60) as r:
-        d = r.read()
-    return d if bajty else d.decode("utf-8", errors="replace")
+        return r.read().decode("utf-8", errors="replace")
 
 
 try:
@@ -23,6 +22,7 @@ try:
         wynik = json.load(f)
 except Exception:
     wynik = {}
+wynik.pop("paliwa", None)      # stary format
 
 # ---------- Zloto (NBP) ----------
 try:
@@ -33,71 +33,81 @@ try:
 except Exception as e:
     print("Blad zlota:", type(e).__name__, str(e)[:100])
 
-# ---------- WIG20 (Stooq) ----------
-try:
-    tekst = pobierz("https://stooq.pl/q/d/l/?s=wig20&i=d")
-    w = [r for r in csv.DictReader(io.StringIO(tekst)) if r.get("Close")]
-    h = [[r["Date"], float(r["Close"])] for r in w[-30:]]
-    if not h:
-        raise ValueError("pusta odpowiedz: " + tekst[:80].replace("\n", " "))
-    wynik["wig20"] = {"cena": h[-1][1], "data": h[-1][0], "hist": h}
-    print("WIG20:", h[-1])
-except Exception as e:
-    print("Blad WIG20:", type(e).__name__, str(e)[:120])
+
+# ---------- WIG20 (kilka prob) ----------
+def wig20():
+    for host in ("stooq.pl", "stooq.com"):
+        url = "https://" + host + "/q/d/l/?s=wig20&i=d"
+        try:
+            tekst = pobierz(url, UA_PRZEGLADARKA)
+            w = [r for r in csv.DictReader(io.StringIO(tekst)) if r.get("Close")]
+            h = [[r["Date"], float(r["Close"])] for r in w[-30:]]
+            if not h:
+                raise ValueError("pusta odpowiedz: " + tekst[:80].replace("\n", " "))
+            return {"cena": h[-1][1], "data": h[-1][0], "hist": h, "zrodlo": "Stooq"}
+        except Exception as e:
+            print("WIG20 -", url, type(e).__name__, str(e)[:100])
+    try:
+        d = json.loads(pobierz("https://query2.finance.yahoo.com/v8/finance/chart/WIG20.WA?range=2mo&interval=1d",
+                               UA_PRZEGLADARKA))
+        r = d["chart"]["result"][0]
+        h = [[datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%d"), round(c, 2)]
+             for t, c in zip(r["timestamp"], r["indicators"]["quote"][0]["close"]) if c is not None][-30:]
+        return {"cena": h[-1][1], "data": h[-1][0], "hist": h, "zrodlo": "Yahoo Finance"}
+    except Exception as e:
+        print("WIG20 - Yahoo", type(e).__name__, str(e)[:100])
+    return None
 
 
-# ---------- Paliwa (Komisja Europejska) ----------
+w = wig20()
+if w:
+    wynik["wig20"] = w
+    print("WIG20:", w["data"], w["cena"], "(", w["zrodlo"], ")")
+else:
+    wynik.pop("wig20", None)
+
+
+# ---------- Paliwa: fuel-prices.eu (dane Komisji Europejskiej) ----------
 def paliwa():
-    import openpyxl
-    strona = pobierz(STRONA_KE)
-    kandydaci = []
-    for href, tekst in re.findall(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', strona, re.S):
-        t = re.sub(r"<[^>]+>", " ", tekst).lower()
-        if "taxes" in t and "latest" in t and "without" not in t:
-            kandydaci.append(urljoin(STRONA_KE, href.replace("&amp;", "&")))
-    print("Kandydatow na plik z cenami:", len(kandydaci))
-    if not kandydaci:
-        raise RuntimeError("nie znaleziono linku do pliku z cenami z podatkami")
-    dane = pobierz(kandydaci[0], bajty=True)
-    wb = openpyxl.load_workbook(io.BytesIO(dane), data_only=True)
-    wiersze = [list(r) for r in wb.worksheets[0].iter_rows(values_only=True)]
-    ip = next((i for i, r in enumerate(wiersze)
-               if any(str(c).strip().lower() in ("poland", "pl", "polska") for c in r if c)), None)
-    if ip is None:
-        raise RuntimeError("nie znaleziono wiersza Polski")
-    kol = {}
-    for r in wiersze[:ip]:
-        for j, c in enumerate(r):
-            t = str(c or "").lower()
-            if "95" in t and "pb95" not in kol:
-                kol["pb95"] = j
-            elif "diesel" in t and "on" not in kol:
-                kol["on"] = j
-            elif "lpg" in t and "lpg" not in kol:
-                kol["lpg"] = j
-    print("Kolumny:", kol, "| wiersz Polski:", wiersze[ip])
-    eur = json.loads(pobierz("https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json"))["rates"][-1]["mid"]
-    data = None
-    for r in wiersze[:ip]:
-        for c in r:
-            if hasattr(c, "strftime"):
-                data = c.strftime("%Y-%m-%d")
+    d = json.loads(pobierz("https://www.fuel-prices.eu/lang/api/country-history.php?cc=PL"))
+    etyk, e95, on = d["labels"], d["e95"], d["diesel"]
+    koniec = datetime.now(timezone.utc).date()
+    start = koniec - timedelta(days=360)
+    kursy = [(r["effectiveDate"], r["mid"]) for r in json.loads(pobierz(
+        "https://api.nbp.pl/api/exchangerates/rates/a/eur/" + str(start) + "/" + str(koniec) +
+        "/?format=json"))["rates"]]
+
+    def kurs(data):
+        k = None
+        for dd, v in kursy:
+            if dd <= data:
+                k = v
+            else:
                 break
-        if data:
-            break
-    out = {"data": data or datetime.now(timezone.utc).strftime("%Y-%m-%d"), "kurs_eur": eur}
-    for k, j in kol.items():
-        v = wiersze[ip][j]
-        if isinstance(v, (int, float)):
-            out[k] = round(v / 1000 * eur, 2)       # EUR/1000 l -> PLN/l
-    if not any(k in out for k in ("pb95", "on", "lpg")):
-        raise RuntimeError("nie udalo sie odczytac cen")
+        return k
+
+    seria = {"pb95": [], "on": []}
+    for i, dt in enumerate(etyk):
+        k = kurs(dt)
+        if k is None:
+            continue
+        if e95[i]:
+            seria["pb95"].append([dt, round(e95[i] * k, 3)])
+        if on[i]:
+            seria["on"].append([dt, round(on[i] * k, 3)])
+    out = {"data": etyk[-1], "kurs_eur": kursy[-1][1]}
+    for nazwa, h in seria.items():
+        h = h[-26:]
+        if h:
+            out[nazwa] = {"cena": h[-1][1], "data": h[-1][0], "hist": h}
+    if "pb95" not in out and "on" not in out:
+        raise RuntimeError("brak danych po przeliczeniu")
     return out
 
 
 try:
     wynik["paliwa"] = paliwa()
-    print("Paliwa:", wynik["paliwa"])
+    print("Paliwa:", {k: (v["cena"] if isinstance(v, dict) else v) for k, v in wynik["paliwa"].items()})
 except Exception as e:
     print("Blad paliw:", type(e).__name__, str(e)[:200])
 
