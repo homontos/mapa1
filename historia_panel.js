@@ -263,7 +263,7 @@
         var wiek = Math.ceil((Date.now() / 1000 - s[0].t) / 60);
         suwak.min = -Math.min(720, Math.max(1, wiek));
         zegar.textContent = hhmm(Date.now() / 1000) + " (teraz)";
-        podsum.textContent = "Przesuń suwak w lewo, aby cofnąć czas. Dostępne: " + Math.min(720, wiek) + " min.";
+        podsum.textContent = "Przesuń suwak w lewo, aby cofnąć czas. Dostępne: " + Math.min(1440, wiek) + " min.";
         if (cb) cb();
       })
       .catch(function () { podsum.textContent = "Brak historii. Sprawdź automat „Historia ruchu”."; });
