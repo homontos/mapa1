@@ -27,11 +27,32 @@ MAKS_NOWYCH = 15  # Zmniejszono z 30, aby odciążyć API Gemini
 DNI = 7
 KLUCZ = os.environ.get("GEMINI_API_KEY", "").strip()
 SLOWA = re.compile(
-    r"missile|drone|uav|strike|attack|airstrike|military|army|navy|naval|warship|troops|shell|rocket|"
-    r"offensive|ceasefire|fighter|submarine|artillery|houthi|hezbollah|hamas|idf|invasion|frigate|"
-    r"destroyer|bomb|clash|battle|war\b|killed|soldier|defen[cs]e|"
-    r"wojsk|dron|rakiet|granic|rosj|prowokacj|dywersj|okręt|armia|nato|eskalacj|obron",
-    re.I)
+    # Ogólne działania wojenne, starcia i incydenty (EN)
+    r"missile|cruise missile|drone|uav|usv|geran|shahed|strike|attack|airstrike|military|army|troops|soldier|infantry|"
+    r"offensive|ceasefire|truce|invasion|clash|battle|war\b|warfare|combat|killed|casualt|wounded|"
+    r"bomb|explosion|blast|shelling|shell\b|ambush|raid|siege|blockade|retaliat|escalat|"
+    r"sabotage|arson|espionage|cyberattack|terror|hostage|alert|siren|airspace|violation|provocation|"
+    r"unidentified object|foiled|thwarted|border closure|security guarantee|"
+    # Lotnictwo i obrona powietrzna (EN)
+    r"fighter|bomber|aircraft|jet\b|helicopter|interceptor|stealth|hypersonic|ballistic|"
+    r"air defen[cs]e|radar|sortie|reconnaissance|surveillance|airbase|air base|shot down|shoot down|downed|"
+    # Marynarka wojenna i morze (EN)
+    r"navy|naval|warship|frigate|destroyer|corvette|submarine|carrier|fleet|vessel|"
+    r"patrol boat|torpedo|maritime|amphibious|coast guard|strait|minefield|naval mine|"
+    # Wojska lądowe, sprzęt, ćwiczenia, geografia strategiczna i broń (EN)
+    r"artillery|howitzer|mortar|rocket|munition|ammunition|ordnance|weapon|tank\b|armored|armoured|"
+    r"bunker|fortification|trench|convoy|brigade|division|battalion|regiment|deployment|deployed|"
+    r"drill|exercise|training|wargame|maneuver|"
+    r"nuclear|warhead|icbm|deterrence|defen[cs]e|pentagon|centcom|nato|idf|irgc|houthi|hezbollah|hamas|"
+    r"kaliningrad|baltic|suwalki|"
+    # Polskie słowa kluczowe (w tym ćwiczenia, Baltic Monitor i Alert RCB)
+    r"wojsk|dron|gierań|geran|rakiet|pocisk|manewrując|uderzeniow|granic|zamknięcie granic|rosj|prowokacj|dywersj|sabotaż|podpaleni|szpieg|"
+    r"okręt|fregat|niszczyciel|armia|marynark|lotnictw|myśliw|bombow|czołg|artyleri|amunicj|bunkier|umocnieni|"
+    r"nato|eskalacj|obron|dowództw|dywizj|kaliningrad|królewiec|bałtyck|przesmyk suwalski|gwarancj|udaremnion|"
+    r"nalot|ostrzał|wybuch|eksplozj|alarm|syren|rcb|naruszeni|przestrzeni powietrzn|niezidentyfikowan|"
+    r"ćwiczen|ćwiczyć|ćwiczą|manewr|"
+    r"nuklearn|jądrow|balistyczn|hipersonicz|blokad|cieśnin|żołnierz|ofiar|rann|rozejm|inwazj|ofensyw|starci",
+    re.I,)
 
 if not KLUCZ:
     raise SystemExit("Brak sekretu GEMINI_API_KEY")
