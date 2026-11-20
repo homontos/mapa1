@@ -167,7 +167,6 @@ def wczytaj(sciezka, domyslnie):
     except Exception:
         return domyslnie
 
-
 dane_stare = wczytaj(PLIK, {"czas": int(time.time()), "zdarzenia": []})
 stare = dane_stare.get("zdarzenia", [])
 stary_czas = dane_stare.get("czas", int(time.time()))
@@ -184,14 +183,16 @@ for url in KANALY:
     print("Kanal", url.split("/")[2], "- artykulow:", len(pozycje))
     for p in pozycje[:25]:
         pid = hashlib.sha1(p["link"].encode()).hexdigest()[:10]
-    if p["link"] and pid not in znane and (SLOWA.search(p["tytul"] + " " + p["opis"]) or "baltic-monitor" in p["z"]):
+        if p["link"] and pid not in znane and (SLOWA.search(p["tytul"] + " " + p["opis"]) or "baltic-monitor" in p["z"]):
             p["id"] = pid
             kandydaci.append(p)
             znane.add(pid)
+
 kandydaci = sorted(kandydaci, key=lambda p: -p["t"])[:MAKS_NOWYCH]
 print("Kandydatow do tlumaczenia:", len(kandydaci))
 for p in kandydaci:
-print("  kandydat:", time.strftime("%d.%m %H:%M", time.gmtime(p["t"])), p["z"], "|", p["tytul"][:70])
+    print("  kandydat:", time.strftime("%d.%m %H:%M", time.gmtime(p["t"])), p["z"], "|", p["tytul"][:70])
+
 nowe = []
 ai_sukces = False
 if kandydaci:
@@ -231,3 +232,4 @@ with open(PLIK, "w", encoding="utf-8") as f:
 with open(CACHE, "w", encoding="utf-8") as f:
     json.dump(cache, f, ensure_ascii=False, separators=(",", ":"))
 print("Nowych:", len(nowe), "| lacznie w 7 dniach:", len(wszystkie))
+
