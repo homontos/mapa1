@@ -261,7 +261,7 @@
         var s = d.snapshoty || [];
         if (s.length < 2) { podsum.textContent = "Za mało danych (zapisów: " + s.length + "). Historia wypełnia się z czasem."; return; }
         var wiek = Math.ceil((Date.now() / 1000 - s[0].t) / 60);
-        suwak.min = -Math.min(720, Math.max(1, wiek));
+        suwak.min = -Math.min(1440, Math.max(1, wiek));
         zegar.textContent = hhmm(Date.now() / 1000) + " (teraz)";
         podsum.textContent = "Przesuń suwak w lewo, aby cofnąć czas. Dostępne: " + Math.min(1440, wiek) + " min.";
         if (cb) cb();
