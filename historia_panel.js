@@ -33,7 +33,7 @@
     '<div class="h-w"><button id="h-live" class="zywo">● NA ŻYWO</button>' +
     '<button id="h-graj">▶</button><button id="h-pred">×1</button>' +
     '<span id="h-zegar">–</span><button id="h-x" aria-label="Zamknij">✕</button></div>' +
-    '<input type="range" id="h-suwak" min="-720" max="0" step="1" value="0">' +
+    '<input type="range" id="h-suwak" min="-1440" max="0" step="1" value="0">' +
     '<div id="h-podsum">Ładowanie historii…</div>' +
     '<div id="h-info">Zapis co ok. 5 min, pozycje między zapisami są interpolowane. ' +
     '×1 = 1 min historii na sekundę. Nieoficjalne dane, nie zastępują syren.</div>';
