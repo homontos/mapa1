@@ -103,7 +103,7 @@ def lista_modeli():
     # Dodano 'omni' do odrzucanych, bo ma bardzo niskie limity (błąd 429)
     zle = ("image", "tts", "audio", "live", "embedding", "vision", "robotics", "computer", "customtools", "omni")
     flash = [n for n in nazwy if "flash" in n and not any(z in n for z in zle)]
-    pref = [n for n in ("gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-flash-lite-latest") if n in flash]
+    pref = [n for n in ("gemini-flash-lite-latest", "gemini-flash-latest") if n in flash]
     reszta = sorted([n for n in flash if n not in pref], reverse=True)
     reszta.sort(key=lambda n: ("preview" in n or "exp" in n))
     wynik = pref + reszta
@@ -190,25 +190,32 @@ for url in KANALY:
             znane.add(pid)
 kandydaci = sorted(kandydaci, key=lambda p: -p["t"])[:MAKS_NOWYCH]
 print("Kandydatow do tlumaczenia:", len(kandydaci))
-
+for p in kandydaci:
+print("  kandydat:", time.strftime("%d.%m %H:%M", time.gmtime(p["t"])), p["z"], "|", p["tytul"][:70])
 nowe = []
 ai_sukces = False
 if kandydaci:
     try:
         for r in ai(kandydaci):
             i = r.get("i")
-            if not isinstance(i, int) or i >= len(kandydaci) or not r.get("wojsk"):
+            if not isinstance(i, int) or i >= len(kandydaci):
+                continue
+            p = kandydaci[i]
+            if not r.get("wojsk"):
+                print("  odrzucone (nie wojskowe):", p["tytul"][:60])
                 continue
             if r.get("region") not in REGIONY or not r.get("miejsce") or not r.get("tekst"):
+                print("  odrzucone (region/miejsce):", r.get("region"), "|", r.get("miejsce"), "|", p["tytul"][:50])
                 continue
             wsp = geokoduj(r["miejsce"], cache)
             if not wsp:
+                print("  odrzucone (brak wspolrzednych):", r["miejsce"], "|", p["tytul"][:50])
                 continue
-            p = kandydaci[i]
             nowe.append({"id": p["id"], "t": p["t"], "kraj": str(r.get("kraj", ""))[:40],
                          "reg": r["region"], "kat": r["kat"] if r.get("kat") in KATEGORIE else "inne",
                          "tekst": str(r["tekst"])[:300], "u": p["link"], "z": p["z"],
                          "lat": round(wsp[0], 3), "lon": round(wsp[1], 3)})
+            print("  dodane:", time.strftime("%d.%m %H:%M", time.gmtime(p["t"])), r["miejsce"], "|", p["tytul"][:50])
         ai_sukces = True
     except Exception as e:
         print("Blad AI:", type(e).__name__, str(e)[:200])
