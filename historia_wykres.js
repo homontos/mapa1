@@ -129,7 +129,7 @@
     var k = document.getElementById("h-wyk-kursor");
     if (!k || !seria || seria.v.length < 2) return;
     var now = Date.now() / 1000;
-    var t0 = Math.max(seria.v[0][0], now - 720 * 60);
+    var t0 = Math.max(seria.v[0][0], now - 1440 * 60);
     var t = now + (+suwak.value) * 60;
     var x = 24 + (t - t0) / (now - t0) * (296 - 24);
     x = Math.max(24, Math.min(296, x));
