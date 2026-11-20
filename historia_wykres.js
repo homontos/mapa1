@@ -58,7 +58,7 @@
   function rysuj() {
     if (!seria || seria.v.length < 2) { tekst.textContent = "Drony i rakiety · za mało danych"; spark.textContent = ""; return; }
     var now = Date.now() / 1000;
-    var t0 = Math.max(seria.v[0][0], now - 720 * 60), t1 = now;
+    var t0 = Math.max(seria.v[0][0], now - 1440 * 60), t1 = now;
     var v = seria.v.filter(function (p) { return p[0] >= t0; });
     var mx = v.reduce(function (a, p) { return p[1] > a[1] ? p : a; }, v[0]);
     var godz = Math.max(1, Math.round((t1 - t0) / 3600));
