@@ -122,7 +122,7 @@ def ai(pozycje):
     for idx, model in enumerate(lista_modeli()):
         if idx > 0:
             time.sleep(4)
-         url = ("https://generativelanguage.googleapis.com/v1beta/models/" + model +
+        url = ("https://generativelanguage.googleapis.com/v1beta/models/" + model +
                ":generateContent?key=" + KLUCZ)
         try:
             odp = json.loads(pobierz(url, ciało, {"Content-Type": "application/json"}))
