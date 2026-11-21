@@ -1,4 +1,6 @@
 (function () {
+  var SZER = 440;      // szerokosc panelu kafli na komputerze (px)
+  var WYS = 270;       // wysokosc jednego kafla na komputerze (px)
   var czesci = location.pathname.split("/").filter(Boolean);
   var BAZA = "https://raw.githubusercontent.com/" + location.hostname.split(".")[0] + "/" +
     (czesci[0] || "") + "/dane/";
@@ -8,11 +10,21 @@
   var lewa = document.getElementById("lewa");
   if (!lewa) return;
 
+  var MQ = window.matchMedia ? window.matchMedia("(min-width: 900px) and (hover: hover) and (pointer: fine)") : null;
+  function DOCK() { return !!(MQ && MQ.matches); }
+
   var st = document.createElement("style");
   st.textContent =
     "#kafle{position:fixed;z-index:5;display:none;top:calc(env(safe-area-inset-top,0px) + 8px);" +
     "left:50px;right:6px;bottom:62px;grid-template-columns:1fr 1fr;" +
     "grid-template-rows:repeat(6,minmax(0,1fr));gap:6px}" +
+    "#kafle.dock{left:auto;right:8px;top:8px;width:" + SZER + "px;grid-template-columns:1fr;" +
+    "grid-template-rows:none;grid-auto-rows:" + WYS + "px;align-content:start;overflow-y:auto}" +
+    "#kafle.dock .kafel.szeroki{grid-column:auto}" +
+    "body.kafle-dock #map{right:" + (SZER + 16) + "px!important}" +
+    "body.kafle-dock #gora-panel{right:" + (SZER + 24) + "px!important}" +
+    "body.kafle-dock #hist-panel{left:calc((100vw - " + (SZER + 16) + "px)/2)!important}" +
+    "body.kafle-dock #kamera{right:" + (SZER + 24) + "px!important}" +
     ".kafel{position:relative;background:" + TLO + ";backdrop-filter:blur(4px);" +
     "-webkit-backdrop-filter:blur(4px);border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.3);" +
     "display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;color:#222;font:12px sans-serif}" +
@@ -25,7 +37,7 @@
   var kont = document.createElement("div");
   kont.id = "kafle";
   document.body.appendChild(kont);
-  var otwarte = false;
+  var otwarte = false, ciala = [], budowniczowie = [];
 
   // ---------- Pomocnicze ----------
   function f(x, m) {
@@ -163,7 +175,7 @@
           w.appendChild(a);
         }
         w.addEventListener("click", function () {
-          zamknij();
+          if (!DOCK()) zamknij();
           map.flyTo({ center: [z.lon, z.lat], zoom: Math.max(map.getZoom(), 6) });
         });
         b.appendChild(w);
@@ -263,7 +275,7 @@
       });
       var mx = v.reduce(function (a, p) { return p[1] > a[1] ? p : a; }, v[0]);
       var t0 = Math.max(v[0][0], od), maxY = Math.max(4, Math.ceil(mx[1] * 1.1));
-      var W = 300, L = 24, R = 296, top = 14, bot = 92;
+      var L = 24, R = 296, top = 14, bot = 92;
       function X(t) { return L + (t - t0) / (teraz - t0) * (R - L); }
       function Y(y) { return bot - y / maxY * (bot - top); }
       var s = '<svg viewBox="0 0 300 120" width="100%" style="display:block">';
@@ -336,36 +348,56 @@
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Otwieranie i zamykanie ----------
+  // ---------- Otwieranie, zamykanie, odswiezanie ----------
+  function przeladujMape() {
+    setTimeout(function () { try { map.resize(); } catch (err) {} }, 60);
+  }
   function zamknij() {
     otwarte = false;
     kont.style.display = "none";
+    kont.className = "";
     kont.textContent = "";
+    document.body.classList.remove("kafle-dock");
     btn.classList.remove("akt");
+    przeladujMape();
+  }
+  function wypelnij() {
+    for (var i = 0; i < budowniczowie.length; i++) budowniczowie[i](ciala[i]);
   }
   function otworz() {
-    var x = document.getElementById("gora-x");        // zamknij panel u gory, jesli otwarty
-    if (x && document.getElementById("gora-panel").style.display === "block") x.click();
+    var x = document.getElementById("gora-x"), gp = document.getElementById("gora-panel");
+    if (!DOCK() && x && gp && gp.style.display === "block") x.click();   // na telefonie zamknij panel u gory
     kont.textContent = "";
-    var k1 = kafel("Kursy i ropa");
-    var k2 = kafel("Złoto, WIG20, paliwa");
+    ciala = [kafel("Kursy i ropa"), kafel("Złoto, WIG20, paliwa"), kafel("Blisko granicy Polski"),
+      kafel("Pogoda – Gdynia"), kafel("Wiadomości militarne (7 dni)", true),
+      kafel("Statystyki obwodów – cała Ukraina (30 dni)", true),
+      kafel("Drony i rakiety – ostatnie 24 godziny", true), kafel("Trendy dzienne", true)];
+    budowniczowie = [budujKursy, budujRynekPlus, budujGranice, budujPogode, budujWiadomosci, budujStat, budujDrony, budujTrendy];
     var zam = e("button", "", "✕");
     zam.className = "zam";
     zam.setAttribute("aria-label", "Zamknij kafle");
     zam.addEventListener("click", zamknij);
-    k2.kafel.appendChild(zam);
-    var k3 = kafel("Blisko granicy Polski");
-    var k4 = kafel("Pogoda – Gdynia");
-    var k5 = kafel("Wiadomości militarne (7 dni)", true);
-    var k6 = kafel("Statystyki obwodów – cała Ukraina (30 dni)", true);
-    var k7 = kafel("Drony i rakiety – ostatnie 24 godziny", true);
-    var k8 = kafel("Trendy dzienne", true);
+    ciala[1].kafel.appendChild(zam);
+    kont.className = DOCK() ? "dock" : "";
+    document.body.classList.toggle("kafle-dock", DOCK());
     kont.style.display = "grid";
     otwarte = true;
     btn.classList.add("akt");
-    budujKursy(k1); budujRynekPlus(k2); budujGranice(k3); budujPogode(k4);
-    budujWiadomosci(k5); budujStat(k6); budujDrony(k7); budujTrendy(k8);
+    przeladujMape();
+    wypelnij();
   }
+
+  // Na komputerze dane w otwartych kaflach odswiezaja sie same (z zachowaniem przewiniecia)
+  setInterval(function () {
+    if (!otwarte || !DOCK() || document.hidden) return;
+    var poz = ciala.map(function (c) { return c.scrollTop; });
+    var gl = kont.scrollTop;
+    wypelnij();
+    setTimeout(function () {
+      ciala.forEach(function (c, i) { c.scrollTop = poz[i]; });
+      kont.scrollTop = gl;
+    }, 1500);
+  }, 120000);
 
   var btn = document.createElement("button");
   btn.className = "ikona-menu";
@@ -375,9 +407,14 @@
   btn.addEventListener("click", function () { if (otwarte) zamknij(); else otworz(); });
   setTimeout(function () { lewa.appendChild(btn); }, 500);
 
-  // Dotkniecie innej ikony menu zamyka kafle
+  // Na telefonie dotkniecie innej ikony zamyka kafle; na komputerze zostaja otwarte
   lewa.addEventListener("click", function (ev) {
     var t = ev.target;
-    if (otwarte && t && t.classList && t.classList.contains("ikona-menu") && t !== btn) zamknij();
+    if (otwarte && !DOCK() && t && t.classList && t.classList.contains("ikona-menu") && t !== btn) zamknij();
   });
+
+  // Zmiana rozmiaru okna lub urzadzenia: przeladuj uklad
+  if (MQ && MQ.addEventListener) {
+    MQ.addEventListener("change", function () { if (otwarte) { zamknij(); otworz(); } });
+  }
 })();
