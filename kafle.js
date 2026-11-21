@@ -1,12 +1,12 @@
 (function () {
-  var SZER = 440;      // szerokosc panelu kafli na komputerze (px)
-  var WYS = 270;       // wysokosc jednego kafla na komputerze (px)
+  var SZER = 400;      // szerokosc panelu kafli na komputerze (px)
+  var WYS = 150;       // wysokosc jednego rzedu kafli na komputerze (px)
   var czesci = location.pathname.split("/").filter(Boolean);
   var BAZA = "https://raw.githubusercontent.com/" + location.hostname.split(".")[0] + "/" +
     (czesci[0] || "") + "/dane/";
   var TLO = "rgba(224,227,231,0.93)";
-  var INNE = "Poza Ukrainą / inne";
   var IKONY = { rakieta: "🚀", dron: "🛸", starcie: "💥", marynarka: "⚓", alarm: "⚠️", inne: "📍" };
+  var KOL_OST = { 1: "#f2c200", 2: "#f08c00", 3: "#e03131" };
   var lewa = document.getElementById("lewa");
   if (!lewa) return;
 
@@ -18,19 +18,27 @@
     "#kafle{position:fixed;z-index:5;display:none;top:calc(env(safe-area-inset-top,0px) + 8px);" +
     "left:50px;right:6px;bottom:62px;grid-template-columns:1fr 1fr;" +
     "grid-template-rows:repeat(6,minmax(0,1fr));gap:6px}" +
-    "#kafle.dock{left:auto;right:8px;top:8px;width:" + SZER + "px;grid-template-columns:1fr;" +
-    "grid-template-rows:none;grid-auto-rows:" + WYS + "px;align-content:start;overflow-y:auto}" +
-    "#kafle.dock .kafel.szeroki{grid-column:auto}" +
-    "body.kafle-dock #map{right:" + (SZER + 16) + "px!important}" +
+    "#kafle.dock{left:auto;right:8px;top:8px;bottom:auto;width:" + SZER + "px;" +
+    "max-height:calc(100vh - 70px);grid-template-rows:none;grid-auto-rows:" + WYS + "px;gap:10px;" +
+    "overflow-y:auto;align-content:start;pointer-events:none;scrollbar-width:none}" +
+    "#kafle.dock .kafel{pointer-events:auto}" +
+    "body.kafle-dock .maplibregl-ctrl-top-right{right:" + (SZER + 8) + "px}" +
     "body.kafle-dock #gora-panel{right:" + (SZER + 24) + "px!important}" +
     "body.kafle-dock #hist-panel{left:calc((100vw - " + (SZER + 16) + "px)/2)!important}" +
     "body.kafle-dock #kamera{right:" + (SZER + 24) + "px!important}" +
     ".kafel{position:relative;background:" + TLO + ";backdrop-filter:blur(4px);" +
-    "-webkit-backdrop-filter:blur(4px);border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,0.3);" +
-    "display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;color:#222;font:12px sans-serif}" +
+    "-webkit-backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.55);border-radius:10px;" +
+    "box-shadow:0 1px 6px rgba(0,0,0,0.3);display:flex;flex-direction:column;min-height:0;min-width:0;" +
+    "overflow:hidden;color:#222;font:12px sans-serif}" +
     ".kafel.szeroki{grid-column:span 2}" +
+    ".kafel.wysoki{grid-row:span 2}" +
     ".kafel h4{margin:0;padding:5px 8px 3px;font-size:12px;flex:none;border-bottom:1px solid rgba(0,0,0,0.1)}" +
     ".kafel .tr{flex:1;overflow-y:auto;padding:4px 8px;-webkit-overflow-scrolling:touch;min-height:0}" +
+    ".kafel .tr.bez{padding:0;overflow:hidden}" +
+    ".kafel .tr.bez svg{width:100%;height:100%;display:block}" +
+    ".kafel .tr.pol{display:flex;gap:6px;padding:4px 6px;overflow:hidden}" +
+    ".kafel .tr.pol>div{flex:1;min-width:0;overflow:hidden}" +
+    ".kafel .tr.pol svg{width:100%;height:100%;display:block}" +
     ".kafel .zam{position:absolute;top:2px;right:4px;border:0;background:none;font-size:18px;cursor:pointer;color:#333}";
   document.head.appendChild(st);
 
@@ -62,16 +70,16 @@
     var v = h.map(function (x) { return x[1]; });
     var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), z = (mx - mn) || 1;
     var p = v.map(function (y, i) {
-      return (i * (250 / (v.length - 1))).toFixed(1) + "," + (30 - (y - mn) / z * 28).toFixed(1);
+      return (i * (250 / (v.length - 1))).toFixed(1) + "," + (24 - (y - mn) / z * 22).toFixed(1);
     }).join(" ");
     var gora = v[v.length - 1] >= v[0];
     var kolor = (gora !== !!zly) ? "#2f9e44" : "#e03131";
-    return '<svg viewBox="0 0 250 32" width="100%" height="32" preserveAspectRatio="none">' +
+    return '<svg viewBox="0 0 250 26" width="100%" height="26" preserveAspectRatio="none">' +
       '<polyline fill="none" stroke="' + kolor + '" stroke-width="2" points="' + p + '"/></svg>';
   }
-  function kafel(tytul, szeroki) {
+  function kafel(tytul, klasy) {
     var k = e("div");
-    k.className = "kafel" + (szeroki ? " szeroki" : "");
+    k.className = "kafel" + (klasy ? " " + klasy : "");
     k.appendChild(e("h4", "", tytul));
     var b = e("div");
     b.className = "tr";
@@ -90,18 +98,19 @@
       var s = e("div");
       s.innerHTML = spark(hist, zly);
       b.appendChild(s);
-      b.appendChild(e("div", "font-size:10px;color:#555;margin-bottom:3px",
+      b.appendChild(e("div", "font-size:9px;color:#555;margin-bottom:3px",
         krotki + " " + okres + ": " + zm(proc(hist, krotki)) + " · " + (hist.length - 1) + " " +
         okres + ": " + zm(proc(hist, hist.length - 1)) + (data ? " · " + data : "")));
     }
   }
-  function brak(b) { b.textContent = "Brak danych."; }
+  function brak(b) { b.className = "tr"; b.textContent = "Brak danych."; }
 
-  // ---------- Kafel 1: kursy i ropa ----------
+  // ---------- Kafel 1: ropa, potem kursy ----------
   function budujKursy(b) {
+    b.className = "tr";
     pobierz("rynek.json?t=" + Date.now()).then(function (d) {
       b.textContent = "";
-      [["usd", "USD/PLN", " zł", 4], ["eur", "EUR/PLN", " zł", 4], ["brent", "Ropa Brent", " USD", 2]]
+      [["brent", "Ropa Brent", " USD", 2], ["usd", "USD/PLN", " zł", 4], ["eur", "EUR/PLN", " zł", 4]]
         .forEach(function (p) {
           var o = d[p[0]];
           if (!o) return;
@@ -111,22 +120,23 @@
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 2: zloto, WIG20, paliwa ----------
+  // ---------- Kafel 2: zloto, potem WIG20 i paliwa ----------
   function budujRynekPlus(b) {
+    b.className = "tr";
     pobierz("rynek_plus.json?t=" + Date.now()).then(function (d) {
       b.textContent = "";
-      if (d.wig20) seria(b, "WIG20", d.wig20.cena, d.wig20.hist, " pkt", 2, "notowań", 5, false, d.wig20.data);
       if (d.zloto) seria(b, "Złoto (1 g)", d.zloto.cena, d.zloto.hist, " zł", 2, "notowań", 5, false, d.zloto.data);
+      if (d.wig20) seria(b, "WIG20", d.wig20.cena, d.wig20.hist, " pkt", 2, "notowań", 5, false, d.wig20.data);
       if (d.paliwa) {
         if (d.paliwa.pb95) seria(b, "Pb95 (śr.)", d.paliwa.pb95.cena, d.paliwa.pb95.hist, " zł/l", 2, "tyg.", 4, true, d.paliwa.pb95.data);
         if (d.paliwa.on) seria(b, "ON (śr.)", d.paliwa.on.cena, d.paliwa.on.hist, " zł/l", 2, "tyg.", 4, true, d.paliwa.on.data);
-        b.appendChild(e("div", "font-size:10px;color:#666", "Paliwa: fuel-prices.eu (CC BY 4.0), dane tygodniowe KE, przeliczone po kursie NBP."));
+        b.appendChild(e("div", "font-size:9px;color:#666", "Paliwa: fuel-prices.eu (CC BY 4.0), dane tygodniowe KE, przeliczone po kursie NBP."));
       }
       if (!b.firstChild) brak(b);
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 3: blisko granicy (przechwycenie panelu ikony granicy) ----------
+  // ---------- Kafel 3: blisko granicy PL - tylko wykres ----------
   function przechwyc(przycisk) {
     var oryg = window.pokazSzczegoly, fly = map.flyTo, wynik = null;
     window.pokazSzczegoly = function (t, w) { wynik = { t: t, w: w }; };
@@ -137,27 +147,55 @@
     return wynik;
   }
   function budujGranice(b) {
+    b.className = "tr bez";
     var p = document.getElementById("granica-odz");
     var w = p ? przechwyc(p) : null;
     b.textContent = "";
-    if (w) b.appendChild(w.w); else brak(b);
+    if (!w) { brak(b); return; }
+    b.textContent = "Ładowanie archiwum…";
+    var n = 0;
+    var t = setInterval(function () {
+      n++;
+      var svg = w.w.querySelector("svg");
+      if (svg) {
+        clearInterval(t);
+        b.textContent = "";
+        var kopia = svg.cloneNode(true);
+        kopia.removeAttribute("style");
+        b.appendChild(kopia);
+      } else if (n > 40 || /Brak/.test(w.w.textContent)) {
+        clearInterval(t);
+        b.className = "tr";
+        b.textContent = "Brak archiwum zbliżeń (zbyt mało zapisów historii).";
+      }
+    }, 250);
   }
 
-  // ---------- Kafel 4: pogoda Gdynia ----------
-  function budujPogode(b) {
-    b.textContent = "";
-    ["gdynia-pogoda", "gdynia-wykres"].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      var kopia = el.cloneNode(true);
-      kopia.removeAttribute("id");
-      b.appendChild(kopia);
-    });
-    if (!b.firstChild) b.textContent = "Pogoda się jeszcze ładuje. Otwórz kafle ponownie za chwilę.";
+  // ---------- Kafel 4: ostrzezenia IMGW - pomorskie ----------
+  function budujPomorskie(b) {
+    b.className = "tr";
+    pobierz("ostrzezenia.json?t=" + Date.now()).then(function (d) {
+      var g = (d.woj || {})["22"];
+      var l = ((g && g.lista) || []).filter(function (w) { return !/susz/i.test(String(w.zjawisko || "")); });
+      l.sort(function (a, c) { return (c.stopien || 0) - (a.stopien || 0); });
+      b.textContent = "";
+      if (!l.length) b.appendChild(e("div", "margin:4px 0", "Brak aktywnych ostrzeżeń IMGW dla woj. pomorskiego."));
+      l.slice(0, 6).forEach(function (w) {
+        var dt = new Date(String(w.do || "").replace(" ", "T"));
+        var r = e("div", "margin:4px 0;padding-left:6px;border-left:4px solid " + (KOL_OST[w.stopien] || "#868e96"));
+        r.appendChild(e("div", "font-weight:bold", (w.zjawisko || "ostrzeżenie") + " – " + (w.stopien || "?") + ". stopień"));
+        if (!isNaN(dt.getTime())) {
+          r.appendChild(e("div", "font-size:10px;color:#555", "do " + dt.toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })));
+        }
+        b.appendChild(r);
+      });
+      b.appendChild(e("div", "font-size:9px;color:#666;margin-top:4px", "Dane: IMGW-PIB (bez suszy hydrologicznej). Nie zastępuje komunikatów IMGW ani Alertu RCB."));
+    }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 5: wiadomosci militarne ----------
+  // ---------- Kafel 5: wiadomosci militarne (wysoki) ----------
   function budujWiadomosci(b) {
+    b.className = "tr";
     pobierz("swiat.json?t=" + Date.now()).then(function (d) {
       b.textContent = "";
       var l = (d.zdarzenia || []).slice(0, 40);
@@ -183,111 +221,75 @@
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 6: statystyki obwodow (cala Ukraina, wszystkie typy) ----------
-  function budujStat(b) {
-    pobierz("statystyki.json?t=" + Date.now()).then(function (d) {
-      var dni = d.dni || {};
-      function suma(k) {
-        var w = dni[k];
-        if (!w) return null;
-        var s = 0;
-        Object.keys(w).forEach(function (o) {
-          if (o === INNE) return;
-          var g = w[o];
-          s += (g.d || 0) + (g.r || 0) + (g.k || 0);
-        });
-        return s;
+  // ---------- Kafel 6: pogoda Gdynia - tekst po lewej, wykres po prawej ----------
+  function budujPogode(b, n) {
+    var t = document.getElementById("gdynia-pogoda"), w = document.getElementById("gdynia-wykres");
+    var svg = w && w.querySelector("svg");
+    if (!t || !t.children.length || !svg) {
+      b.className = "tr";
+      b.textContent = "Ładowanie pogody…";
+      if ((n || 0) < 6) {
+        setTimeout(function () { if (otwarte && b.isConnected) budujPogode(b, (n || 0) + 1); }, 2000);
       }
-      var dz = new Date(), tab = [];
-      for (var i = 29; i >= 0; i--) {
-        var k = new Date(Date.UTC(dz.getUTCFullYear(), dz.getUTCMonth(), dz.getUTCDate() - i)).toISOString().slice(0, 10);
-        tab.push({ k: k, w: suma(k) });
-      }
-      var ma = tab.filter(function (x) { return x.w !== null; });
-      if (!ma.length) { brak(b); return; }
-      var max = Math.max.apply(null, [1].concat(ma.map(function (x) { return x.w; })));
-      var bw = (300 - 36) / 30, bot = 78, top = 10;
-      var s = '<svg viewBox="0 0 300 96" width="100%" style="display:block">';
-      tab.forEach(function (x, i) {
-        var xx = 30 + i * bw;
-        if (x.w === null) {
-          s += '<rect x="' + (xx + 1).toFixed(1) + '" y="' + (bot - 2) + '" width="' + (bw - 2).toFixed(1) + '" height="2" fill="#bbb"/>';
-        } else {
-          var h = x.w / max * (bot - top);
-          s += '<rect x="' + (xx + 1).toFixed(1) + '" y="' + (bot - h).toFixed(1) + '" width="' + (bw - 2).toFixed(1) +
-            '" height="' + Math.max(h, x.w ? 1 : 0).toFixed(1) + '" fill="' + (i === 29 ? "#ff8787" : "#e8590c") + '"/>';
-        }
-        if (i % 5 === 0 || i === 29) {
-          s += '<text x="' + (xx + bw / 2).toFixed(1) + '" y="90" font-size="8" fill="#555" text-anchor="middle">' +
-            x.k.slice(8, 10) + "." + x.k.slice(5, 7) + "</text>";
-        }
-      });
-      s += '<text x="26" y="' + (top + 4) + '" font-size="9" fill="#555" text-anchor="end">' + max + "</text>" +
-        '<text x="26" y="' + bot + '" font-size="9" fill="#555" text-anchor="end">0</text>' +
-        '<line x1="28" y1="' + bot + '" x2="300" y2="' + bot + '" stroke="#999" stroke-width="0.8"/></svg>';
-      b.textContent = "";
-      var w = e("div");
-      w.innerHTML = s;
-      b.appendChild(w);
-      var razem = ma.reduce(function (a, x) { return a + x.w; }, 0);
-      var naj = ma.reduce(function (a, x) { return x.w > a.w ? x : a; }, ma[0]);
-      var os = tab.slice(-7), po = tab.slice(-14, -7);
-      var okO = os.every(function (x) { return x.w !== null; }), okP = po.length === 7 && po.every(function (x) { return x.w !== null; });
-      var t = "Cała Ukraina, wszystkie typy. Suma: " + razem + " (dni z danymi: " + ma.length + "). Najgorszy dzień: " +
-        naj.k.slice(8, 10) + "." + naj.k.slice(5, 7) + " (" + naj.w + ").";
-      if (okO && okP) {
-        var a7 = os.reduce(function (a, x) { return a + x.w; }, 0), b7 = po.reduce(function (a, x) { return a + x.w; }, 0);
-        t += b7 > 0 ? " 7 dni vs poprzednie 7: " + zm((a7 - b7) / b7 * 100) + " (" + a7 + " vs " + b7 + ")."
-          : " 7 dni: " + a7 + ", poprzednie 7: " + b7 + ".";
-      } else t += " Porównanie 7 dni pojawi się po 14 dniach danych.";
-      b.appendChild(e("div", "font-size:11px;color:#444", t));
-      b.appendChild(e("div", "font-size:10px;color:#666;margin-top:4px",
-        "Liczba obiektów zgłoszonych w NEPTUN (doby UTC), od uruchomienia zbierania. To trend z doniesień, nie oficjalne dane."));
-    }).catch(function () { brak(b); });
+      return;
+    }
+    b.className = "tr pol";
+    b.textContent = "";
+    var lewy = e("div", "font-size:12px");
+    var kt = t.cloneNode(true);
+    kt.removeAttribute("id");
+    kt.style.cssText = "border:0;margin:0;padding:0;font-size:12px";
+    lewy.appendChild(kt);
+    var prawy = e("div");
+    var ks = svg.cloneNode(true);
+    ks.removeAttribute("style");
+    prawy.appendChild(ks);
+    b.appendChild(lewy);
+    b.appendChild(prawy);
   }
 
-  // ---------- Kafel 7: drony i rakiety, ostatnie 24 h ----------
+  // ---------- Kafel 7: drony i rakiety, 24 h - tylko wykres dopasowany do kafla ----------
   function budujDrony(b) {
+    b.className = "tr bez";
     pobierz(BAZA + "historia_ruchu.json?t=" + Math.floor(Date.now() / 60000)).then(function (h) {
       var DR = { uav: 1, recon: 1, missile: 1, ballistic: 1 }, KR = { missile: 1, ballistic: 1 };
-      var teraz = Date.now() / 1000, od = teraz - 86400, v = [], ev = [], poprz = {}, ostD = 0, ostR = 0;
+      var teraz = Date.now() / 1000, od = teraz - 86400, v = [], ev = [], poprz = {};
       (h.snapshoty || []).forEach(function (x, i) {
         if (x.bn) return;
-        var suma = 0, ids = {}, dd = 0, rr = 0;
+        var suma = 0, ids = {};
         (x.n || []).forEach(function (r) {
           if (r[7] || !DR[r[1]]) return;
-          var c = r[6] > 0 ? r[6] : 1;
-          suma += c;
-          if (KR[r[1]]) rr += c; else dd += c;
+          suma += r[6] > 0 ? r[6] : 1;
           var k = r[0] || (r[1] + Math.round(r[2] * 10) + "_" + Math.round(r[3] * 10));
           ids[k] = 1;
           if (i > 0 && KR[r[1]] && !poprz[k]) ev.push(x.t);
         });
         v.push([x.t, suma]);
-        ostD = dd; ostR = rr;
         poprz = ids;
       });
       v = v.filter(function (p) { return p[0] >= od; });
-      if (v.length < 2) { b.textContent = "Za mało danych historii (zapisów: " + v.length + ")."; return; }
+      if (v.length < 2) { b.className = "tr"; b.textContent = "Za mało danych historii (zapisów: " + v.length + ")."; return; }
       var sr = v.map(function (p) {
         var o = v.filter(function (q) { return q[0] <= p[0] && q[0] >= p[0] - 1800; });
         return [p[0], o.reduce(function (s, q) { return s + q[1]; }, 0) / o.length];
       });
       var mx = v.reduce(function (a, p) { return p[1] > a[1] ? p : a; }, v[0]);
+      var W = Math.max(200, b.clientWidth || 300), H = Math.max(70, b.clientHeight || 100);
       var t0 = Math.max(v[0][0], od), maxY = Math.max(4, Math.ceil(mx[1] * 1.1));
-      var L = 24, R = 296, top = 14, bot = 92;
+      var L = 26, R = W - 6, top = 15, bot = H - 15;
       function X(t) { return L + (t - t0) / (teraz - t0) * (R - L); }
       function Y(y) { return bot - y / maxY * (bot - top); }
-      var s = '<svg viewBox="0 0 300 120" width="100%" style="display:block">';
+      var s = '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none">';
       [0, maxY / 2, maxY].forEach(function (g) {
         s += '<line x1="' + L + '" y1="' + Y(g).toFixed(1) + '" x2="' + R + '" y2="' + Y(g).toFixed(1) +
           '" stroke="#ccc" stroke-width="0.7"/><text x="' + (L - 3) + '" y="' + (Y(g) + 3).toFixed(1) +
-          '" font-size="8" fill="#555" text-anchor="end">' + (Math.round(g * 10) / 10) + "</text>";
+          '" font-size="9" fill="#555" text-anchor="end">' + (Math.round(g * 10) / 10) + "</text>";
       });
+      var krok = W < 260 ? 6 : 3;
       var dt = new Date(t0 * 1000); dt.setMinutes(0, 0, 0);
       for (var t = dt.getTime() / 1000; t <= teraz; t += 3600) {
-        if (t < t0 || new Date(t * 1000).getHours() % 3) continue;
-        s += '<text x="' + X(t).toFixed(1) + '" y="112" font-size="8" fill="#555" text-anchor="middle">' +
+        if (t < t0 || new Date(t * 1000).getHours() % krok) continue;
+        s += '<text x="' + X(t).toFixed(1) + '" y="' + (H - 3) + '" font-size="9" fill="#555" text-anchor="middle">' +
           new Date(t * 1000).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) + "</text>";
       }
       v.forEach(function (p) {
@@ -297,61 +299,20 @@
       s += '<polyline fill="none" stroke="#333" stroke-width="1.8" points="' +
         sr.map(function (p) { return X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1); }).join(" ") + '"/>';
       ev.filter(function (x) { return x >= t0; }).forEach(function (x) {
-        s += '<circle cx="' + X(x).toFixed(1) + '" cy="' + (bot + 7) + '" r="2.6" fill="#e03131"/>';
+        s += '<circle cx="' + X(x).toFixed(1) + '" cy="' + (bot + 6) + '" r="2.4" fill="#e03131"/>';
       });
       var ost = v[v.length - 1][1], srAll = Math.round(v.reduce(function (a, p) { return a + p[1]; }, 0) / v.length);
-      var pig = ost + " · śr. " + srAll, pw = pig.length * 5.4 + 10;
+      var pig = ost + " · śr. " + srAll, pw = pig.length * 5.6 + 10;
       s += '<rect x="' + (R - pw) + '" y="1" width="' + pw + '" height="13" rx="6" fill="rgba(0,0,0,0.75)"/>' +
         '<text x="' + (R - pw / 2) + '" y="10.5" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle">' + pig + "</text></svg>";
       b.textContent = "";
-      b.appendChild(e("div", "font-weight:bold", "Teraz: drony " + ostD + " · rakiety " + ostR));
-      var w = e("div");
-      w.innerHTML = s;
-      b.appendChild(w);
-      b.appendChild(e("div", "font-size:11px;color:#444",
-        "Najwięcej naraz: " + mx[1] + " o " + new Date(mx[0] * 1000).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) +
-        ". Linia: średnia krocząca z 30 min. Słupki: liczba obiektów w zapisie (ok. 5 min). Czerwone kropki: nowe rakiety."));
-    }).catch(function () { brak(b); });
-  }
-
-  // ---------- Kafel 8: trendy dzienne (wszystkie wykresy pod soba) ----------
-  function budujTrendy(b) {
-    var M = [["g", "Statki – Zatoka Gdańska"], ["o", "Statki – Ormuz"], ["b", "Statki – Bab el-Mandeb"],
-      ["s", "Samoloty nad Polską (starsza seria)"], ["a", "Alarmy lotnicze UA (liczba obszarów)"],
-      ["d", "Drony i rakiety (NEPTUN)"]];
-    pobierz("historia.json?t=" + Date.now()).then(function (d) {
-      b.textContent = "";
-      M.forEach(function (m) {
-        var pkt = [];
-        Object.keys(d.dni || {}).sort().forEach(function (k) {
-          var w = d.dni[k][m[0]];
-          if (w && w[1]) pkt.push([k, w[0] / w[1]]);
-        });
-        pkt = pkt.slice(-30);
-        b.appendChild(e("div", "font-weight:bold;margin-top:6px", m[1]));
-        if (pkt.length < 2) { b.appendChild(e("div", "font-size:11px;color:#666", "Za mało danych (dni: " + pkt.length + ").")); return; }
-        var v = pkt.map(function (p) { return p[1]; });
-        var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), z = (mx - mn) || 1, n = v.length;
-        var pts = v.map(function (y, i) {
-          return (10 + i * (240 / (n - 1))).toFixed(1) + "," + (40 - (y - mn) / z * 34).toFixed(1);
-        }).join(" ");
-        var kol = v[n - 1] >= v[0] ? "#2f9e44" : "#e03131";
-        var g = e("div");
-        g.innerHTML = '<svg viewBox="0 0 260 46" width="100%" preserveAspectRatio="none"><polyline fill="none" stroke="' + kol +
-          '" stroke-width="2" points="' + pts + '"/></svg>';
-        b.appendChild(g);
-        b.appendChild(e("div", "font-size:10px;color:#555",
-          "Ostatni dzień: " + f(v[n - 1], 1) + " · min " + f(mn, 1) + " · max " + f(mx, 1) + " · " + pkt[0][0] + " do " + pkt[n - 1][0]));
-      });
-      b.appendChild(e("div", "font-size:10px;color:#666;margin-top:6px",
-        "Średnia dzienna z próbek zapisywanych co ok. 3 godz. W Ormuzie i Bab el-Mandeb pozycje AIS mogą być fałszywe."));
+      var g = e("div", "width:100%;height:100%");
+      g.innerHTML = s;
+      b.appendChild(g);
     }).catch(function () { brak(b); });
   }
 
   // ---------- Otwieranie, zamykanie, odswiezanie ----------
-  function przeladujMape() {
-    setTimeout(function () { try { map.resize(); } catch (err) {} }, 60);
-  }
   function zamknij() {
     otwarte = false;
     kont.style.display = "none";
@@ -359,7 +320,6 @@
     kont.textContent = "";
     document.body.classList.remove("kafle-dock");
     btn.classList.remove("akt");
-    przeladujMape();
   }
   function wypelnij() {
     for (var i = 0; i < budowniczowie.length; i++) budowniczowie[i](ciala[i]);
@@ -368,11 +328,12 @@
     var x = document.getElementById("gora-x"), gp = document.getElementById("gora-panel");
     if (!DOCK() && x && gp && gp.style.display === "block") x.click();   // na telefonie zamknij panel u gory
     kont.textContent = "";
-    ciala = [kafel("Kursy i ropa"), kafel("Złoto, WIG20, paliwa"), kafel("Blisko granicy Polski"),
-      kafel("Pogoda – Gdynia"), kafel("Wiadomości militarne (7 dni)", true),
-      kafel("Statystyki obwodów – cała Ukraina (30 dni)", true),
-      kafel("Drony i rakiety – ostatnie 24 godziny", true), kafel("Trendy dzienne", true)];
-    budowniczowie = [budujKursy, budujRynekPlus, budujGranice, budujPogode, budujWiadomosci, budujStat, budujDrony, budujTrendy];
+    ciala = [kafel("Ropa i kursy"), kafel("Złoto, WIG20, paliwa"), kafel("Blisko granicy PL (24 h)"),
+      kafel("Ostrzeżenia IMGW – pomorskie"),
+      kafel("Wiadomości militarne (7 dni)", "szeroki wysoki"),
+      kafel("Pogoda – Gdynia", "szeroki"),
+      kafel("Drony i rakiety – 24 godziny", "szeroki")];
+    budowniczowie = [budujKursy, budujRynekPlus, budujGranice, budujPomorskie, budujWiadomosci, budujPogode, budujDrony];
     var zam = e("button", "", "✕");
     zam.className = "zam";
     zam.setAttribute("aria-label", "Zamknij kafle");
@@ -383,7 +344,6 @@
     kont.style.display = "grid";
     otwarte = true;
     btn.classList.add("akt");
-    przeladujMape();
     wypelnij();
   }
 
@@ -413,7 +373,6 @@
     if (otwarte && !DOCK() && t && t.classList && t.classList.contains("ikona-menu") && t !== btn) zamknij();
   });
 
-  // Zmiana rozmiaru okna lub urzadzenia: przeladuj uklad
   if (MQ && MQ.addEventListener) {
     MQ.addEventListener("change", function () { if (otwarte) { zamknij(); otworz(); } });
   }
