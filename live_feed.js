@@ -117,6 +117,7 @@
         <button data-region="Bałtyk">Bałtyk</button>
         <button data-region="Ormuz">Ormuz</button>
         <button data-region="Morze Czerwone">Huti / Bab</button>
+        <button data-region="Ukraina / M. Czarne">Ukraina</button>
       </div>
       <div id="feed-list">Ładowanie raportów...</div>
     </div>
