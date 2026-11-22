@@ -28,4 +28,6 @@ jobs:
           git config --global user.name "OSINT Bot"
           git config --global user.email "bot@://github.com"
           git add feed.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update live feed" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update live feed" && git push vs)
+      - name: Install dependencies
+        run: pip install beautifulsoup4 requests
