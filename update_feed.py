@@ -13,22 +13,24 @@ HEADERS = {
 
 TG_CHANNELS = [
     "sztuka_wojny",
+    "AbuAliExpress",         # Główny kanał OSINT: Gaza, Izrael, Liban, Zachodni Brzeg
+    "idfofficial",           # Oficjalne komunikaty i zdjęcia IDF
+    "manniefabian",          # Korespondent wojskowy (Izrael / Gaza / Liban)
     "Osint613",
     "OSINTdefender",
     "Middle_East_Spectator",
-    "warmonitors",
     "DeepStateUA",
     "operativnoZSU"
 ]
 
-# Kolejność ma znaczenie: najpierw sprawdzamy konkretne regiony (Izrael, Ormuz, Morze Czerwone)
 LOCATIONS = [
     ([
         "israel", "izrael", "gaza", "gazie", "idf", "hamas", "hezbollah",
         "lebanon", "liban", "beirut", "bejrut", "west bank", "zachodni brzeg",
         "jerusalem", "jerozolim", "tel aviv", "tel awiw", "rafah", "khan yunis",
         "hebron", "jenin", "nablus", "syria", "syrii", "damascus", "damaszek",
-        "golan", "jordan", "jordani", "haifa", "hajfa", "netanyahu", "netanjahu"
+        "golan", "jordan", "jordani", "haifa", "hajfa", "netanyahu", "netanjahu",
+        "palestin", "palestyń"
     ], 31.95, 35.10, "Izrael / Lewant"),
 
     ([
@@ -74,7 +76,7 @@ def fetch_telegram():
             if r.status_code != 200:
                 continue
             soup = BeautifulSoup(r.text, "html.parser")
-            msgs = soup.select(".tgme_widget_message_wrap")[-15:]
+            msgs = soup.select(".tgme_widget_message_wrap")[-25:]
             for msg in msgs:
                 text_el = msg.select_one(".tgme_widget_message_text")
                 if not text_el:
@@ -108,13 +110,24 @@ def fetch_telegram():
     return events
 
 def main():
-    events = fetch_telegram()
-    events.sort(key=lambda x: x["date"], reverse=True)
-    print(f"SUMA POBRANYCH WYDARZEŃ: {len(events)}")
-    if len(events) > 0:
+    raw_events = fetch_telegram()
+    raw_events.sort(key=lambda x: x["date"], reverse=True)
+
+    # Bierzemy po max 10 najnowszych wpisów z KAŻDEGO regionu osobno,
+    # aby żaden region nie zdominował całej listy
+    balanced = []
+    counts = {}
+    for ev in raw_events:
+        reg = ev["region"]
+        if counts.get(reg, 0) < 10:
+            balanced.append(ev)
+            counts[reg] = counts.get(reg, 0) + 1
+
+    print(f"Statystyki regionów: {counts}")
+    if len(balanced) > 0:
         with open("feed.json", "w", encoding="utf-8") as f:
-            json.dump(events[:40], f, ensure_ascii=False, indent=2)
-        print("Zapisano nowe dane do feed.json")
+            json.dump(balanced, f, ensure_ascii=False, indent=2)
+        print("Zapisano zbalansowane dane do feed.json")
 
 if __name__ == "__main__":
     main()
