@@ -1,9 +1,11 @@
 import json
 import random
 import re
+from datetime import datetime, timedelta, timezone
 import requests
 import urllib3
 from bs4 import BeautifulSoup
+from deep_translator import GoogleTranslator
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -13,15 +15,18 @@ HEADERS = {
 
 TG_CHANNELS = [
     "sztuka_wojny",
-    "AbuAliExpress",         # Główny kanał OSINT: Gaza, Izrael, Liban, Zachodni Brzeg
-    "idfofficial",           # Oficjalne komunikaty i zdjęcia IDF
-    "manniefabian",          # Korespondent wojskowy (Izrael / Gaza / Liban)
+    "AbuAliExpress",
+    "idfofficial",
+    "manniefabian",
     "Osint613",
     "OSINTdefender",
     "Middle_East_Spectator",
     "DeepStateUA",
     "operativnoZSU"
 ]
+
+# Kanały, które już publikują po polsku (pomijamy tłumaczenie)
+POLISH_CHANNELS = {"sztuka_wojny"}
 
 LOCATIONS = [
     ([
@@ -57,6 +62,28 @@ LOCATIONS = [
     ], 45.20, 33.50, "Ukraina / M. Czarne")
 ]
 
+translator = GoogleTranslator(source="auto", target="pl")
+
+def translate_to_pl(text, channel):
+    if channel in POLISH_CHANNELS or not text:
+        return text
+    try:
+        return translator.translate(text)
+    except Exception as e:
+        print(f"Błąd tłumaczenia ({channel}): {e}")
+        return text
+
+def is_within_24h(date_str, cutoff_time):
+    if not date_str:
+        return False
+    try:
+        post_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        if post_dt.tzinfo is None:
+            post_dt = post_dt.replace(tzinfo=timezone.utc)
+        return post_dt >= cutoff_time
+    except Exception:
+        return False
+
 def match_location(text):
     t = text.lower()
     for words, lat, lon, region in LOCATIONS:
@@ -68,6 +95,8 @@ def match_location(text):
 
 def fetch_telegram():
     events = []
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
+
     for ch in TG_CHANNELS:
         try:
             url = "/".join(["https:", "", "t.me", "s", ch])
@@ -75,18 +104,35 @@ def fetch_telegram():
             print(f"TG @{ch}: status {r.status_code}")
             if r.status_code != 200:
                 continue
+
             soup = BeautifulSoup(r.text, "html.parser")
             msgs = soup.select(".tgme_widget_message_wrap")[-25:]
+
             for msg in msgs:
+                date_el = msg.select_one("time.time")
+                date_str = date_el["datetime"] if date_el and date_el.has_attr("datetime") else ""
+
+                # Odrzucamy wpisy starsze niż 24 godziny
+                if not is_within_24h(date_str, cutoff_time):
+                    continue
+
                 text_el = msg.select_one(".tgme_widget_message_text")
                 if not text_el:
                     continue
-                text = text_el.get_text(" ", strip=True)
-                loc = match_location(text)
+                raw_text = text_el.get_text(" ", strip=True)
+
+                loc = match_location(raw_text)
                 if not loc:
                     continue
                 lat, lon, region = loc
-                date_el = msg.select_one("time.time")
+
+                # Tłumaczymy skrócony tekst jednorazowo, żeby przyspieszyć działanie
+                short_raw = raw_text[:300]
+                translated = translate_to_pl(short_raw, ch)
+
+                title = translated[:85] + ("..." if len(translated) > 85 else "")
+                summary = translated[:240] + ("..." if len(translated) > 240 else "")
+
                 link_el = msg.select_one("a.tgme_widget_message_date")
                 photo_el = msg.select_one(".tgme_widget_message_photo_wrap")
                 image = None
@@ -94,16 +140,17 @@ def fetch_telegram():
                     m = re.search(r"background-image:url\('(.*?)'\)", photo_el["style"])
                     if m:
                         image = m.group(1)
+
                 events.append({
-                    "title": text[:85] + ("..." if len(text) > 85 else ""),
-                    "summary": text[:240] + ("..." if len(text) > 240 else ""),
+                    "title": title,
+                    "summary": summary,
                     "lat": lat,
                     "lon": lon,
                     "region": region,
                     "image": image,
                     "source": "@" + ch,
                     "url": link_el["href"] if link_el else url,
-                    "date": date_el["datetime"] if date_el else ""
+                    "date": date_str
                 })
         except Exception as e:
             print(f"TG @{ch} błąd: {e}")
@@ -113,8 +160,6 @@ def main():
     raw_events = fetch_telegram()
     raw_events.sort(key=lambda x: x["date"], reverse=True)
 
-    # Bierzemy po max 10 najnowszych wpisów z KAŻDEGO regionu osobno,
-    # aby żaden region nie zdominował całej listy
     balanced = []
     counts = {}
     for ev in raw_events:
@@ -123,11 +168,10 @@ def main():
             balanced.append(ev)
             counts[reg] = counts.get(reg, 0) + 1
 
-    print(f"Statystyki regionów: {counts}")
-    if len(balanced) > 0:
-        with open("feed.json", "w", encoding="utf-8") as f:
-            json.dump(balanced, f, ensure_ascii=False, indent=2)
-        print("Zapisano zbalansowane dane do feed.json")
+    print(f"Statystyki regionów (ostatnie 24h): {counts}")
+    with open("feed.json", "w", encoding="utf-8") as f:
+        json.dump(balanced, f, ensure_ascii=False, indent=2)
+    print(f"Zapisano {len(balanced)} świeżych wydarzeń po polsku do feed.json")
 
 if __name__ == "__main__":
     main()
