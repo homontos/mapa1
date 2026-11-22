@@ -1,5 +1,5 @@
 (function () {
-  var SZER = 400;      // szerokosc panelu kafli na komputerze (px)
+  var SZER = 280;      // szerokosc panelu kafli na komputerze (px)
   var WYS = 150;       // wysokosc jednego rzedu kafli na komputerze (px)
   var czesci = location.pathname.split("/").filter(Boolean);
   var BAZA = "https://raw.githubusercontent.com/" + location.hostname.split(".")[0] + "/" +
