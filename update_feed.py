@@ -9,7 +9,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5"
 }
 
 RSS_FEEDS = [
@@ -21,9 +21,9 @@ RSS_FEEDS = [
 TG_CHANNELS = ["OSINTdefender", "Osint613", "DeepStateUA", "operativnoZSU", "Middle_East_Spectator"]
 
 LOCATIONS = [
-    (["gdansk", "gdańsk", "baltic", "bałtyk", "kaliningrad", "tanker", "shadow fleet", "flota cieni", "finland", "sweden", "gotland", "nord stream", "poland", "polsk", "marynark"], 54.85, 18.80, "Bałtyk"),
+    (["gdansk", "gdańsk", "baltic", "bałtyk", "kaliningrad", "tanker", "shadow fleet", "flota cieni", "finland", "sweden", "gotland", "nord stream", "poland", "polsk", "marynark", "okręt", "morz"], 54.85, 18.80, "Bałtyk"),
     (["hormuz", "ormuz", "persian gulf", "zatoka perska", "iran", "oman", "fujairah", "bandar abbas"], 26.56, 56.25, "Ormuz"),
-    (["houthi", "huti", "red sea", "morze czerwone", "bab al-mandab", "bab el-mandeb", "yemen", "jemen", "aden", "hodeidah", "ukmto", "israel", "gaza", "lebanon"], 13.20, 43.10, "Morze Czerwone"),
+    (["houthi", "huti", "red sea", "morze czerwone", "bab al-mandab", "bab el-mandeb", "yemen", "jemen", "aden", "hodeidah", "ukmto", "israel", "gaza", "lebanon", "bliski wschód"], 13.20, 43.10, "Morze Czerwone"),
     (["ukraine", "ukrain", "crimea", "krym", "black sea", "morze czarne", "odesa", "odessa", "sevastopol", "sewastopol", "russia", "rosj", "kharkiv", "donetsk"], 45.20, 33.50, "Ukraina / M. Czarne")
 ]
 
@@ -31,7 +31,6 @@ def match_location(text):
     t = text.lower()
     for words, lat, lon, region in LOCATIONS:
         if any(w in t for w in words):
-            # Lekkie rozrzucenie pinezek na wodzie, aby nie leżały w jednym punkcie
             j_lat = round(lat + random.uniform(-0.35, 0.35), 4)
             j_lon = round(lon + random.uniform(-0.45, 0.45), 4)
             return j_lat, j_lon, region
@@ -42,37 +41,35 @@ def fetch_rss():
     for name, url in RSS_FEEDS:
         try:
             r = requests.get(url, headers=HEADERS, timeout=20, verify=False)
-            print(f"RSS {name}: status {r.status_code}, długość {len(r.content)}")
+            print(f"RSS {name}: status {r.status_code}, początek: {r.text[:80]!r}")
             if r.status_code != 200:
                 continue
 
-            # BeautifulSoup radzi sobie z nieidealnym XML bez błędów składni
             soup = BeautifulSoup(r.content, "html.parser")
-            items = soup.find_all("item")[:25]
-            print(f"RSS {name}: znaleziono {len(items)} artykułów")
+            # Szukamy zarówno <item> (RSS), <entry> (Atom), jak i <article> (gdy strona zwraca HTML)
+            items = soup.find_all(["item", "entry"])[:25]
+            print(f"RSS {name}: znaleziono {len(items)} wpisów")
 
             for item in items:
                 title_tag = item.find("title")
                 title = title_tag.get_text(strip=True) if title_tag else ""
 
-                # W html.parser tag <link> bywa pusty, a adres siedzi obok jako tekst
                 link = ""
                 link_tag = item.find("link")
                 if link_tag:
-                    link = link_tag.get_text(strip=True) or (link_tag.next_sibling.strip() if link_tag.next_sibling else "")
+                    link = link_tag.get("href") or link_tag.get_text(strip=True) or (link_tag.next_sibling.strip() if link_tag.next_sibling else "")
                 if not link:
                     guid_tag = item.find("guid")
                     link = guid_tag.get_text(strip=True) if guid_tag else url
 
-                date_tag = item.find("pubdate")
+                date_tag = item.find(["pubdate", "published", "updated"])
                 pub_date = date_tag.get_text(strip=True) if date_tag else ""
 
-                desc_tag = item.find("description")
+                desc_tag = item.find(["description", "summary", "content"])
                 desc_html = desc_tag.get_text() if desc_tag else ""
                 desc_soup = BeautifulSoup(desc_html, "html.parser")
                 summary = desc_soup.get_text(" ", strip=True)[:220] + "..."
 
-                # Szukanie zdjęcia w RSS
                 image = None
                 enc = item.find("enclosure")
                 if enc and enc.get("url"):
@@ -108,13 +105,15 @@ def fetch_telegram():
     events = []
     for ch in TG_CHANNELS:
         try:
-            url = "https://t.me" + ch
+            url = "/".join(["https:", "", "t.me", "s", ch])
             r = requests.get(url, headers=HEADERS, timeout=15, verify=False)
-            print(f"TG @{ch}: status {r.status_code}")
+            print(f"TG @{ch} ({url}): status {r.status_code}")
             if r.status_code != 200:
                 continue
             soup = BeautifulSoup(r.text, "html.parser")
-            for msg in soup.select(".tgme_widget_message_wrap")[-15:]:
+            msgs = soup.select(".tgme_widget_message_wrap")[-15:]
+            print(f"TG @{ch}: znaleziono {len(msgs)} wiadomości")
+            for msg in msgs:
                 text_el = msg.select_one(".tgme_widget_message_text")
                 if not text_el:
                     continue
