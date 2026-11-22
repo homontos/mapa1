@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install beautifulsoup4 requests urllib3
+        run: pip install beautifulsoup4 requests urllib3 deep-translator
       - name: Run OSINT scraper
         run: python update_feed.py
       - name: Commit and push feed.json
