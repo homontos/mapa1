@@ -18,16 +18,12 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install beautifulsoup4 google-genai pydantic
+        run: pip install beautifulsoup4 requests urllib3
       - name: Run OSINT scraper
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python update_feed.py
       - name: Commit and push feed.json
         run: |
           git config --global user.name "OSINT Bot"
           git config --global user.email "bot@://github.com"
           git add feed.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update live feed" && git push vs)
-      - name: Install dependencies
-        run: pip install beautifulsoup4 requests
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update live feed" && git push origin main)
