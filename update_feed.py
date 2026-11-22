@@ -11,18 +11,26 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
 }
 
-# Kanał @sztuka_wojny na pierwszym miejscu, żeby polskie wpisy były na samej górze
 TG_CHANNELS = [
     "sztuka_wojny",
-    "OSINTdefender",
     "Osint613",
+    "OSINTdefender",
     "Middle_East_Spectator",
+    "warmonitors",
     "DeepStateUA",
     "operativnoZSU"
 ]
 
-# Rozszerzone słowa kluczowe (PL + EN + UA + RU)
+# Kolejność ma znaczenie: najpierw sprawdzamy konkretne regiony (Izrael, Ormuz, Morze Czerwone)
 LOCATIONS = [
+    ([
+        "israel", "izrael", "gaza", "gazie", "idf", "hamas", "hezbollah",
+        "lebanon", "liban", "beirut", "bejrut", "west bank", "zachodni brzeg",
+        "jerusalem", "jerozolim", "tel aviv", "tel awiw", "rafah", "khan yunis",
+        "hebron", "jenin", "nablus", "syria", "syrii", "damascus", "damaszek",
+        "golan", "jordan", "jordani", "haifa", "hajfa", "netanyahu", "netanjahu"
+    ], 31.95, 35.10, "Izrael / Lewant"),
+
     ([
         "gdansk", "gdańsk", "gdyni", "baltic", "bałtyk", "kaliningrad", "królewiec",
         "tanker", "tankow", "shadow fleet", "flota cieni", "finland", "fińsk",
@@ -32,13 +40,12 @@ LOCATIONS = [
 
     ([
         "hormuz", "ormuz", "persian gulf", "zatoka perska", "iran", "oman",
-        "fujairah", "bandar abbas", "teheran", "tehran"
+        "fujairah", "bandar abbas", "teheran", "tehran", "irgc", "kharg"
     ], 26.56, 56.25, "Ormuz"),
 
     ([
         "houthi", "huti", "red sea", "morze czerwone", "bab al-mandab", "bab el-mandeb",
-        "yemen", "jemen", "aden", "hodeidah", "ukmto", "israel", "izrael",
-        "gaza", "gazie", "lebanon", "liban", "hezbollah", "syria", "syrii"
+        "yemen", "jemen", "aden", "hodeidah", "ukmto", "sanaa", "sana"
     ], 13.20, 43.10, "Morze Czerwone"),
 
     ([
@@ -53,7 +60,7 @@ def match_location(text):
     for words, lat, lon, region in LOCATIONS:
         if any(w in t for w in words):
             j_lat = round(lat + random.uniform(-0.35, 0.35), 4)
-            j_lon = round(lon + random.uniform(-0.45, 0.45), 4)
+            j_lon = round(lon + random.uniform(-0.40, 0.40), 4)
             return j_lat, j_lon, region
     return None
 
@@ -102,12 +109,11 @@ def fetch_telegram():
 
 def main():
     events = fetch_telegram()
-    # Sortowanie od najnowszych po dacie publikacji
     events.sort(key=lambda x: x["date"], reverse=True)
     print(f"SUMA POBRANYCH WYDARZEŃ: {len(events)}")
     if len(events) > 0:
         with open("feed.json", "w", encoding="utf-8") as f:
-            json.dump(events[:35], f, ensure_ascii=False, indent=2)
+            json.dump(events[:40], f, ensure_ascii=False, indent=2)
         print("Zapisano nowe dane do feed.json")
 
 if __name__ == "__main__":
