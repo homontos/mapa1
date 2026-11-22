@@ -1,11 +1,12 @@
 import json
 import random
 import re
+import time
 from datetime import datetime, timedelta, timezone
 import requests
 import urllib3
 from bs4 import BeautifulSoup
-from deep_translator import GoogleTranslator
+from deep_translator import GoogleTranslator, MyMemoryTranslator
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -25,7 +26,6 @@ TG_CHANNELS = [
     "operativnoZSU"
 ]
 
-# Kanały, które już publikują po polsku (pomijamy tłumaczenie)
 POLISH_CHANNELS = {"sztuka_wojny"}
 
 LOCATIONS = [
@@ -62,16 +62,32 @@ LOCATIONS = [
     ], 45.20, 33.50, "Ukraina / M. Czarne")
 ]
 
-translator = GoogleTranslator(source="auto", target="pl")
-
 def translate_to_pl(text, channel):
     if channel in POLISH_CHANNELS or not text:
         return text
-    try:
-        return translator.translate(text)
-    except Exception as e:
-        print(f"Błąd tłumaczenia ({channel}): {e}")
+    # Usunięcie emoji/znaków specjalnych, które czasem blokują parser tłumacza
+    clean_text = re.sub(r'[^\w\s.,!?;:\-–—()\'\"/%$€£ zł]', '', text).strip()
+    if not clean_text:
         return text
+
+    try:
+        res = GoogleTranslator(source="auto", target="pl").translate(clean_text[:280])
+        if res:
+            time.sleep(0.3)
+            return res
+    except Exception as e:
+        print(f"GoogleTranslator błąd ({channel}): {e}")
+
+    # Plan zapasowy: MyMemoryTranslator
+    try:
+        res = MyMemoryTranslator(source="en-GB", target="pl-PL").translate(clean_text[:280])
+        if res:
+            time.sleep(0.3)
+            return res
+    except Exception as e2:
+        print(f"MyMemory błąd ({channel}): {e2}")
+
+    return text
 
 def is_within_24h(date_str, cutoff_time):
     if not date_str:
@@ -101,7 +117,6 @@ def fetch_telegram():
         try:
             url = "/".join(["https:", "", "t.me", "s", ch])
             r = requests.get(url, headers=HEADERS, timeout=15, verify=False)
-            print(f"TG @{ch}: status {r.status_code}")
             if r.status_code != 200:
                 continue
 
@@ -112,7 +127,6 @@ def fetch_telegram():
                 date_el = msg.select_one("time.time")
                 date_str = date_el["datetime"] if date_el and date_el.has_attr("datetime") else ""
 
-                # Odrzucamy wpisy starsze niż 24 godziny
                 if not is_within_24h(date_str, cutoff_time):
                     continue
 
@@ -126,13 +140,6 @@ def fetch_telegram():
                     continue
                 lat, lon, region = loc
 
-                # Tłumaczymy skrócony tekst jednorazowo, żeby przyspieszyć działanie
-                short_raw = raw_text[:300]
-                translated = translate_to_pl(short_raw, ch)
-
-                title = translated[:85] + ("..." if len(translated) > 85 else "")
-                summary = translated[:240] + ("..." if len(translated) > 240 else "")
-
                 link_el = msg.select_one("a.tgme_widget_message_date")
                 photo_el = msg.select_one(".tgme_widget_message_photo_wrap")
                 image = None
@@ -142,8 +149,8 @@ def fetch_telegram():
                         image = m.group(1)
 
                 events.append({
-                    "title": title,
-                    "summary": summary,
+                    "channel": ch,
+                    "raw_text": raw_text,
                     "lat": lat,
                     "lon": lon,
                     "region": region,
@@ -160,18 +167,35 @@ def main():
     raw_events = fetch_telegram()
     raw_events.sort(key=lambda x: x["date"], reverse=True)
 
-    balanced = []
+    # Najpierw wybieramy po max 10 wpisów na region
+    selected = []
     counts = {}
     for ev in raw_events:
         reg = ev["region"]
         if counts.get(reg, 0) < 10:
-            balanced.append(ev)
+            selected.append(ev)
             counts[reg] = counts.get(reg, 0) + 1
+
+    # Dopiero wybrane wpisy tłumaczymy na polski
+    final_events = []
+    for ev in selected:
+        translated = translate_to_pl(ev["raw_text"], ev["channel"])
+        final_events.append({
+            "title": translated[:85] + ("..." if len(translated) > 85 else ""),
+            "summary": translated[:240] + ("..." if len(translated) > 240 else ""),
+            "lat": ev["lat"],
+            "lon": ev["lon"],
+            "region": ev["region"],
+            "image": ev["image"],
+            "source": ev["source"],
+            "url": ev["url"],
+            "date": ev["date"]
+        })
 
     print(f"Statystyki regionów (ostatnie 24h): {counts}")
     with open("feed.json", "w", encoding="utf-8") as f:
-        json.dump(balanced, f, ensure_ascii=False, indent=2)
-    print(f"Zapisano {len(balanced)} świeżych wydarzeń po polsku do feed.json")
+        json.dump(final_events, f, ensure_ascii=False, indent=2)
+    print(f"Zapisano {len(final_events)} przetłumaczonych wydarzeń do feed.json")
 
 if __name__ == "__main__":
     main()
