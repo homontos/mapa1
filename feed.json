@@ -1,1 +1,35 @@
-[]
+[
+  {
+    "title": "Wzmożony ruch tankowców floty cieni w rejonie Zatoki Gdańskiej",
+    "summary": "Monitorowane jednostki z wyłączonym transponderem AIS zauważono na kotwicowisku na północ od Półwyspu Helskiego.",
+    "lat": 54.85,
+    "lon": 18.70,
+    "region": "Bałtyk",
+    "image": "https://wikimedia.org",
+    "source": "@darkwaters_init",
+    "url": "https://x.com",
+    "date": "2026-11-22T20:15:00Z"
+  },
+  {
+    "title": "Zakłócenia sygnału GPS i spoofing AIS w Cieśninie Ormuz",
+    "summary": "Zgłoszono silne anomalie nawigacyjne w rejonie Bandar Abbas oraz cieśniny Ormuz wpływające na tankowce.",
+    "lat": 26.56,
+    "lon": 56.25,
+    "region": "Ormuz",
+    "image": "https://wikimedia.org",
+    "source": "@TankerTrackers",
+    "url": "https://x.com",
+    "date": "2026-11-22T19:40:00Z"
+  },
+  {
+    "title": "Ostrzeżenie nawigacyjne UKMTO w Cieśninie Bab el-Mandab",
+    "summary": "Incydent z udziałem bezzałogowych jednostek nawodnych (USV) zgłoszony 40 mil morskich na zachód od Hodeidah.",
+    "lat": 12.65,
+    "lon": 43.30,
+    "region": "Morze Czerwone",
+    "image": "https://wikimedia.org",
+    "source": "@OSINTdefender",
+    "url": "https://t.me",
+    "date": "2026-11-22T18:10:00Z"
+  }
+]
