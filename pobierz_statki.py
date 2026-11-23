@@ -42,9 +42,9 @@ def wczytaj_stare():
     statki = {}
     for ft in dane.get("features", []):
         p = dict(ft["properties"])
-        coords = ft["geometry"]["coordinates"]
-        p["lon"] = coords[0]
-        p["lat"] = coords[1]
+        it = iter(ft["geometry"]["coordinates"])
+        p["lon"] = next(it)
+        p["lat"] = next(it)
         statki[str(p["mmsi"])] = p
     return statki
 
@@ -67,31 +67,37 @@ def czy_baltyk():
 
 def pobierz_json_url(url):
     req = urllib.request.Request(url, headers={
-        "Accept": "application/json;charset=UTF-8",
+        "Accept": "application/json",
         "Accept-Encoding": "gzip",
         "Digitraffic-User": "HomontosMapa1/1.0",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        "User-Agent": "curl/8.5.0"
     })
     with urllib.request.urlopen(req, timeout=30) as resp:
         raw = resp.read()
         if resp.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
             raw = gzip.decompress(raw)
-        tekst = raw.decode("utf-8").strip()
+        tekst = raw.decode("utf-8", errors="replace").strip()
+        print(f"URL {url[:55]}... -> status {resp.status}, bajtow: {len(tekst)}")
         if not tekst:
-            raise ValueError(f"Pusta odpowiedz z {url} (status {resp.status})")
+            raise ValueError("Pusta odpowiedz serwera")
         return json.loads(tekst)
 
 
 def pobierz_digitraffic(statki):
     print("Pobieram dane AIS dla Baltyku z Digitraffic (HELCOM)...")
-    lokacje = pobierz_json_url("https://digitraffic.fi")
-    metadane = pobierz_json_url("https://digitraffic.fi")
+    # Parametry latitude, longitude, radius (w km) dla Zatoki Gdanskiej i poludniowego Baltyku
+    url_lok = "https://digitraffic.fi"
+    lokacje = pobierz_json_url(url_lok)
 
     meta_mapa = {}
-    for m in metadane:
-        mmsi = str(m.get("mmsi", ""))
-        if mmsi:
-            meta_mapa[mmsi] = m
+    try:
+        metadane = pobierz_json_url("https://digitraffic.fi")
+        for m in metadane:
+            mmsi = str(m.get("mmsi", ""))
+            if mmsi:
+                meta_mapa[mmsi] = m
+    except Exception as e_meta:
+        print("Info: nie pobrano nazw statkow (vessels), zapisuje same pozycje:", e_meta)
 
     teraz_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
     dodane = 0
@@ -99,8 +105,9 @@ def pobierz_digitraffic(statki):
         coords = (ft.get("geometry") or {}).get("coordinates") or []
         if len(coords) < 2:
             continue
-        lon = coords[0]
-        lat = coords[1]
+        it = iter(coords)
+        lon = next(it)
+        lat = next(it)
         if not w_obszarze(lat, lon):
             continue
 
