@@ -64,9 +64,44 @@ def pobierz_lista_floty_cieni():
             wiek = time.time() - os.path.getmtime(PLIK_SANKCJE)
             if wiek < 86400:
                 with open(PLIK_SANKCJE, encoding="utf-8") as f:
-                    return json.load(f)
+                    dane = json.load(f)
+                    if len(dane.get("mmsi", {})) > 0 or len(dane.get("imo", {})) > 0:
+                        return dane
     except Exception:
         pass
+
+    print("Pobieram aktualna liste sankcyjna statkow z OpenSanctions (entities.ftm.json)...")
+    host = ".".join(["data", "opensanctions", "org"])
+    url = "/".join(["https:", "", host, "datasets", "latest", "sanctions", "entities.ftm.json"])
+    sankcje = {"mmsi": {}, "imo": {}}
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            for raw_line in resp:
+                if b'"Vessel"' not in raw_line:
+                    continue
+                obj = json.loads(raw_line.decode("utf-8", errors="replace"))
+                if obj.get("schema") != "Vessel":
+                    continue
+                props = obj.get("properties") or {}
+                nazwa = (obj.get("caption") or "").strip()
+                zbiory = ", ".join(obj.get("datasets") or ["Sankcje"])
+                opis = f"{nazwa} ({zbiory})"
+                for m in props.get("mmsi") or []:
+                    m_clean = str(m).strip()
+                    if m_clean.isdigit():
+                        sankcje["mmsi"][m_clean] = opis
+                for im in props.get("imoNumber") or []:
+                    im_clean = "".join(c for c in str(im) if c.isdigit())
+                    if im_clean:
+                        sankcje["imo"][im_clean] = opis
+
+        with open(PLIK_SANKCJE, "w", encoding="utf-8") as f:
+            json.dump(sankcje, f, ensure_ascii=False)
+        print(f"OpenSanctions: zaladowano {len(sankcje['mmsi'])} MMSI i {len(sankcje['imo'])} IMO.")
+    except Exception as e:
+        print("Info: nie udalo sie pobrac OpenSanctions:", e)
+    return sankcje
 
     print("Pobieram aktualna liste sankcyjna statkow z OpenSanctions...")
     host = ".".join(["data", "opensanctions", "org"])
@@ -78,24 +113,7 @@ def pobierz_lista_floty_cieni():
             tekst = resp.read().decode("utf-8", errors="replace")
         reader = csv.DictReader(io.StringIO(tekst))
         for row in reader:
-            if row.get("schema") != "Vessel":
-                continue
-            powod = (row.get("dataset") or "Sankcje").strip()
-            nazwa = (row.get("name") or "").strip()
-            for m in re_split_ids(row.get("mmsi") or ""):
-                sankcje["mmsi"][m] = f"{nazwa} ({powod})"
-            for im in re_split_ids(row.get("imo_number") or row.get("imo") or ""):
-                sankcje["imo"][im] = f"{nazwa} ({powod})"
-
-        with open(PLIK_SANKCJE, "w", encoding="utf-8") as f:
-            json.dump(sankcje, f, ensure_ascii=False)
-        print(f"OpenSanctions: zaladowano {len(sankcje['mmsi'])} MMSI i {len(sankcje['imo'])} IMO.")
-    except Exception as e:
-        print("Info: nie udalo sie pobrac OpenSanctions:", e)
-        if os.path.exists(PLIK_SANKCJE):
-            with open(PLIK_SANKCJE, encoding="utf-8") as f:
-                return json.load(f)
-    return sankcje
+            if row.get("schema") != "
 
 
 def oznacz_flote_cieni(s, sankcje):
