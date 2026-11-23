@@ -57,7 +57,6 @@ def czy_baltyk():
 def re_split_ids(val):
     return [x.strip() for x in val.replace(",", ";").split(";") if x.strip().isdigit()]
 
-
 def pobierz_lista_floty_cieni():
     try:
         if os.path.exists(PLIK_SANKCJE):
@@ -102,7 +101,6 @@ def pobierz_lista_floty_cieni():
     except Exception as e:
         print("Info: nie udalo sie pobrac OpenSanctions:", e)
     return sankcje
-
     print("Pobieram aktualna liste sankcyjna statkow z OpenSanctions...")
     host = ".".join(["data", "opensanctions", "org"])
     url = "/".join(["https:", "", host, "datasets", "latest", "sanctions", "targets.simple.csv"])
