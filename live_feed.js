@@ -115,7 +115,7 @@
       <div class="feed-filtry">
         <button data-region="ALL" class="aktywny-filtr">Wszystkie</button>
         <button data-region="Bałtyk">Bałtyk</button>
-        <button data-region="Izrael">Izrael</button>
+        <button data-region="Izrael / Lewant">Izrael</button>
         <button data-region="Ormuz">Ormuz</button>
         <button data-region="Morze Czerwone">Huti / Bab</button>
         <button data-region="Ukraina / M. Czarne">Ukraina</button>
