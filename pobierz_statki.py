@@ -499,10 +499,7 @@ statki = wczytaj_stare()
 sankcje = pobierz_lista_floty_cieni()
 
 if czy_baltyk():
-    try:
-        pobierz_dma_dania(statki, sekundy=20)
-    except Exception as e:
-        print("Info DMA (Dania):", e)
+           
     try:
         pobierz_digitraffic_caly_baltyk(statki)
     except Exception as e:
