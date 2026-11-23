@@ -1,15 +1,17 @@
 import asyncio
+import gzip
 import json
 import os
 import time
+import urllib.request
 from datetime import datetime, timezone, timedelta
 
 import websockets
 
-KLUCZ = os.environ["AISSTREAM_API_KEY"]
-CZAS_NASLUCHU = 240         # ile sekund nasluchiwac
+KLUCZ = os.environ.get("AISSTREAM_API_KEY", "")
+CZAS_NASLUCHU = 240
 PLIK = os.environ.get("PLIK_WYJSCIOWY", "statki.geojson")
-# Polskie wybrzeze i Zatoka Gdanska: [[szer, dl], [szer, dl]]
+# Polskie wybrzeze i Zatoka Gdanska: [[szer_min, dl_min], [szer_max, dl_max]]
 OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.8, 14.0], [55.2, 20.0]]]"))
 MAX_WIEK = timedelta(hours=6)
 
@@ -46,8 +48,92 @@ def wczytaj_stare():
     return statki
 
 
-async def nasluchuj(statki):
-    async with websockets.connect("wss://stream.aisstream.io/v0/stream") as ws:
+def w_obszarze(lat, lon):
+    for box in OBSZAR:
+        (lat_min, lon_min), (lat_max, lon_max) = box
+        if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
+            return True
+    return False
+
+
+def czy_baltyk():
+    for box in OBSZAR:
+        (lat_min, lon_min), (lat_max, lon_max) = box
+        if 53.0 <= lat_max and lat_min <= 66.0 and 9.0 <= lon_max and lon_min <= 31.0:
+            return True
+    return False
+
+
+def pobierz_json_url(url):
+    req = urllib.request.Request(url, headers={
+        "Digitraffic-User": "HomontosMapa1/1.0",
+        "Accept-Encoding": "gzip",
+        "User-Agent": "Mozilla/5.0"
+    })
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        raw = resp.read()
+        if resp.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+        return json.loads(raw.decode("utf-8"))
+
+
+def pobierz_digitraffic(statki):
+    print("Pobieram dane AIS dla Baltyku z Digitraffic (HELCOM)...")
+    lokacje = pobierz_json_url("https://digitraffic.fi")
+    metadane = pobierz_json_url("https://digitraffic.fi")
+
+    meta_mapa = {}
+    for m in metadane:
+        mmsi = str(m.get("mmsi", ""))
+        if mmsi:
+            meta_mapa[mmsi] = m
+
+    teraz_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    dodane = 0
+    for ft in lokacje.get("features", []):
+        coords = (ft.get("geometry") or {}).get("coordinates") or []
+        if len(coords) < 2:
+            continue
+        lon, lat = coords[0], coords[1]
+        if not w_obszarze(lat, lon):
+            continue
+
+        props = ft.get("properties") or {}
+        mmsi = str(ft.get("mmsi") or props.get("mmsi") or "")
+        if not mmsi:
+            continue
+
+        s = statki.setdefault(mmsi, {"mmsi": mmsi})
+        s["lat"] = lat
+        s["lon"] = lon
+        s["predkosc"] = props.get("sog")
+        s["kurs"] = props.get("cog")
+        s["aktualizacja"] = teraz_iso
+
+        info = meta_mapa.get(mmsi)
+        if info:
+            nazwa = (info.get("name") or "").strip()
+            if nazwa:
+                s["nazwa"] = nazwa
+            cel = (info.get("destination") or "").strip()
+            if cel:
+                s["cel"] = cel
+            opis = opis_typu(info.get("shipType"))
+            if opis:
+                s["typ"] = opis
+        dodane += 1
+
+    print(f"Digitraffic: zaktualizowano {dodane} statkow w obszarze.")
+
+
+async def nasluchuj_aisstream(statki):
+    if not KLUCZ:
+        raise RuntimeError("Brak AISSTREAM_API_KEY")
+    async with websockets.connect(
+        "wss://stream.aisstream.io/v0/stream",
+        open_timeout=25,
+        close_timeout=10
+    ) as ws:
         await ws.send(json.dumps({
             "APIKey": KLUCZ,
             "BoundingBoxes": OBSZAR,
@@ -116,6 +202,11 @@ def zapisz(statki):
             "properties": wlasc,
             "geometry": {"type": "Point", "coordinates": [s["lon"], s["lat"]]},
         })
+
+    if len(cechy) == 0:
+        print("Brak nowych statkow (0) – zachowano dotychczasowy plik", PLIK)
+        return
+
     with open(PLIK, "w", encoding="utf-8") as f:
         json.dump({"type": "FeatureCollection", "features": cechy}, f,
                   ensure_ascii=False)
@@ -123,8 +214,15 @@ def zapisz(statki):
 
 
 statki = wczytaj_stare()
-try:
-    asyncio.run(nasluchuj(statki))
-except Exception as e:
-    print("Blad polaczenia:", e)
+if czy_baltyk():
+    try:
+        pobierz_digitraffic(statki)
+    except Exception as e:
+        print("Blad Digitraffic:", e)
+else:
+    try:
+        asyncio.run(nasluchuj_aisstream(statki))
+    except Exception as e:
+        print("Blad polaczenia AISStream:", e)
+
 zapisz(statki)
