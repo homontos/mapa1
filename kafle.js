@@ -1,12 +1,12 @@
 (function () {
   var SZER = 280;      // szerokosc panelu kafli na komputerze (px)
   var WYS = 150;       // wysokosc jednego rzedu kafli na komputerze (px)
-  var czesci = location.pathname.split("/").filter(Boolean);
-  var BAZA = "https://raw.githubusercontent.com/" + location.hostname.split(".")[0] + "/" +
-    (czesci[0] || "") + "/dane/";
+  var ROT = 25;        // co ile sekund zmienia sie region w wiadomosciach
   var TLO = "rgba(224,227,231,0.93)";
   var IKONY = { rakieta: "🚀", dron: "🛸", starcie: "💥", marynarka: "⚓", alarm: "⚠️", inne: "📍" };
+  var REG = ["Europa Wschodnia", "Bliski Wschód", "Azja i Pacyfik", "Afryka", "Ameryki"];
   var KOL_OST = { 1: "#f2c200", 2: "#f08c00", 3: "#e03131" };
+  var DNI = ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "So"];
   var lewa = document.getElementById("lewa");
   if (!lewa) return;
 
@@ -31,21 +31,22 @@
     "box-shadow:0 1px 6px rgba(0,0,0,0.3);display:flex;flex-direction:column;min-height:0;min-width:0;" +
     "overflow:hidden;color:#222;font:12px sans-serif}" +
     ".kafel.szeroki{grid-column:span 2}" +
-    ".kafel.wysoki{grid-row:span 2}" +
+    ".kafel.wys3{grid-row:span 3}" +
     ".kafel h4{margin:0;padding:5px 8px 3px;font-size:12px;flex:none;border-bottom:1px solid rgba(0,0,0,0.1)}" +
     ".kafel .tr{flex:1;overflow-y:auto;padding:4px 8px;-webkit-overflow-scrolling:touch;min-height:0}" +
     ".kafel .tr.bez{padding:0;overflow:hidden}" +
     ".kafel .tr.bez svg{width:100%;height:100%;display:block}" +
-    ".kafel .tr.pol{display:flex;gap:6px;padding:4px 6px;overflow:hidden}" +
-    ".kafel .tr.pol>div{flex:1;min-width:0;overflow:hidden}" +
+    ".kafel .tr.pol{display:flex;gap:4px;padding:2px 4px;overflow:hidden}" +
+    ".kafel .tr.pol>div{flex:1;min-width:0;min-height:0;overflow:hidden}" +
     ".kafel .tr.pol svg{width:100%;height:100%;display:block}" +
-    ".kafel .zam{position:absolute;top:2px;right:4px;border:0;background:none;font-size:18px;cursor:pointer;color:#333}";
+    ".kafel .zam{position:absolute;top:2px;right:4px;border:0;background:none;font-size:18px;cursor:pointer;color:#333}" +
+    ".kafel button.nw{border:0;background:rgba(0,0,0,0.12);border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer}";
   document.head.appendChild(st);
 
   var kont = document.createElement("div");
   kont.id = "kafle";
   document.body.appendChild(kont);
-  var otwarte = false, ciala = [], budowniczowie = [];
+  var otwarte = false, ciala = [], budowniczowie = [], timer = null;
 
   // ---------- Pomocnicze ----------
   function f(x, m) {
@@ -120,7 +121,7 @@
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 2: zloto, potem WIG20 i paliwa ----------
+  // ---------- Kafel 2: zloto, WIG20, paliwa ----------
   function budujRynekPlus(b) {
     b.className = "tr";
     pobierz("rynek_plus.json?t=" + Date.now()).then(function (d) {
@@ -193,131 +194,161 @@
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 5: wiadomosci militarne (wysoki) ----------
+  // ---------- Kafel 5: wiadomosci militarne, regiony co 25 s ----------
+  var iReg = 0, pauza = false, sek = 0, daneNews = [], UI = null;
+
+  function zRegionu(r) { return daneNews.filter(function (z) { return z.reg === r; }); }
+
+  function rysujNews() {
+    if (!UI || !UI.lista.isConnected) return;
+    var r = REG[iReg], ev = zRegionu(r);
+    UI.nazwa.textContent = "📡 " + r + " (" + ev.length + ")";
+    UI.lista.textContent = "";
+    if (!ev.length) { UI.lista.textContent = "Brak zdarzeń z ostatnich 7 dni w tym regionie."; return; }
+    ev.slice(0, 15).forEach(function (z) {
+      var w = e("div", "margin:4px 0;padding:3px 6px;border-left:3px solid #1c7ed6;cursor:pointer");
+      w.appendChild(e("div", "font-size:10px;color:#555;font-weight:bold",
+        (IKONY[z.kat] || "📍") + " " + (z.kraj || "").toUpperCase() + " · " +
+        new Date(z.t * 1000).toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })));
+      w.appendChild(document.createTextNode(z.tekst + " "));
+      if (/^https?:\/\//.test(z.u || "")) {
+        var a = e("a", "font-size:11px", "↗ " + (z.z || "źródło"));
+        a.href = z.u; a.target = "_blank"; a.rel = "noopener";
+        a.addEventListener("click", function (ev2) { ev2.stopPropagation(); });
+        w.appendChild(a);
+      }
+      w.addEventListener("click", function () {
+        if (!DOCK()) zamknij();
+        map.flyTo({ center: [z.lon, z.lat], zoom: Math.max(map.getZoom(), 6) });
+      });
+      UI.lista.appendChild(w);
+    });
+  }
+  function nastepnyRegion() {
+    for (var i = 1; i <= REG.length; i++) {
+      var k = (iReg + i) % REG.length;
+      if (zRegionu(REG[k]).length) { iReg = k; break; }
+    }
+    sek = 0;
+    rysujNews();
+  }
   function budujWiadomosci(b) {
     b.className = "tr";
     pobierz("swiat.json?t=" + Date.now()).then(function (d) {
+      daneNews = d.zdarzenia || [];
       b.textContent = "";
-      var l = (d.zdarzenia || []).slice(0, 40);
-      if (!l.length) { b.textContent = "Brak zdarzeń z ostatnich 7 dni."; return; }
-      l.forEach(function (z) {
-        var w = e("div", "margin:4px 0;padding:3px 6px;border-left:3px solid #1c7ed6;cursor:pointer");
-        w.appendChild(e("div", "font-size:10px;color:#555;font-weight:bold",
-          (IKONY[z.kat] || "📍") + " " + (z.kraj || "").toUpperCase() + " · " + z.reg + " · " +
-          new Date(z.t * 1000).toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })));
-        w.appendChild(document.createTextNode(z.tekst + " "));
-        if (/^https?:\/\//.test(z.u || "")) {
-          var a = e("a", "font-size:11px", "↗ " + (z.z || "źródło"));
-          a.href = z.u; a.target = "_blank"; a.rel = "noopener";
-          a.addEventListener("click", function (ev) { ev.stopPropagation(); });
-          w.appendChild(a);
-        }
-        w.addEventListener("click", function () {
-          if (!DOCK()) zamknij();
-          map.flyTo({ center: [z.lon, z.lat], zoom: Math.max(map.getZoom(), 6) });
-        });
-        b.appendChild(w);
-      });
+      if (!daneNews.length) { b.textContent = "Brak zdarzeń z ostatnich 7 dni."; UI = null; return; }
+      var gora = e("div", "display:flex;align-items:center;gap:4px");
+      var nazwa = e("b", "flex:1;font-size:12px");
+      var bp = e("button", "", pauza ? "▶" : "⏸");
+      bp.className = "nw";
+      var bd = e("button", "", "⏭");
+      bd.className = "nw";
+      gora.appendChild(nazwa); gora.appendChild(bp); gora.appendChild(bd);
+      var pasWrap = e("div", "height:2px;background:rgba(0,0,0,0.15);margin:3px 0");
+      var pasek = e("div", "height:2px;background:#1c7ed6;width:0");
+      pasWrap.appendChild(pasek);
+      var lista = e("div");
+      b.appendChild(gora); b.appendChild(pasWrap); b.appendChild(lista);
+      UI = { nazwa: nazwa, pasek: pasek, lista: lista, pauza: bp };
+      bp.addEventListener("click", function () { pauza = !pauza; bp.textContent = pauza ? "▶" : "⏸"; });
+      bd.addEventListener("click", nastepnyRegion);
+      if (!zRegionu(REG[iReg]).length) nastepnyRegion(); else rysujNews();
     }).catch(function () { brak(b); });
   }
 
   // ---------- Kafel 6: pogoda Gdynia - tekst po lewej, wykres po prawej ----------
+  var P_CACHE = null, P_T = 0;
+  function pogodaDane(cb) {
+    if (P_CACHE && Date.now() - P_T < 600000) { cb(P_CACHE); return; }
+    pobierz("https://api.open-meteo.com/v1/forecast?latitude=54.5189&longitude=18.5305" +
+      "&hourly=temperature_2m,precipitation&past_days=1&forecast_days=3&timezone=Europe%2FWarsaw")
+      .then(function (d) { P_CACHE = d; P_T = Date.now(); cb(d); })
+      .catch(function () { cb(null); });
+  }
+  function rysujPogode(k) {
+    pogodaDane(function (d) {
+      if (!k.isConnected) return;
+      k.textContent = "";
+      if (!d || !d.hourly) { k.textContent = "Brak wykresu."; return; }
+      var t = d.hourly.time, T = d.hourly.temperature_2m, P = d.hourly.precipitation;
+      var teraz = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Warsaw" }).slice(0, 13).replace(" ", "T");
+      var iN = 24, i;
+      for (i = 0; i < t.length; i++) { if (t[i].slice(0, 13) === teraz) { iN = i; break; } }
+      var a = Math.max(0, iN - 12), z = Math.min(t.length, iN + 37);
+      t = t.slice(a, z); T = T.slice(a, z); P = P.slice(a, z); iN -= a;
+      var n = t.length;
+      var W = Math.max(110, k.clientWidth), H = Math.max(70, k.clientHeight);
+      var L = 22, R = W - 4, top = 12, bot = H - 13;
+      var tv = T.filter(function (x) { return x !== null; });
+      var tmin = Math.floor(Math.min.apply(null, tv)) - 1, tmax = Math.ceil(Math.max.apply(null, tv)) + 1;
+      var pmax = Math.max(2, Math.max.apply(null, P.map(function (x) { return x || 0; })));
+      function X(j) { return L + j * (R - L) / (n - 1); }
+      function Y(v) { return bot - (v - tmin) / (tmax - tmin) * (bot - top); }
+      var s = '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" height="100%">';
+      if (iN > 0) s += '<rect x="' + L + '" y="' + top + '" width="' + (X(iN) - L).toFixed(1) + '" height="' + (bot - top) + '" fill="#000" opacity="0.05"/>';
+      var bw = Math.max(1.2, (R - L) / n * 0.8);
+      for (i = 0; i < n; i++) {
+        var p = P[i] || 0;
+        if (p <= 0) continue;
+        var h = Math.min(1, p / pmax) * (bot - top) * 0.4;
+        s += '<rect x="' + (X(i) - bw / 2).toFixed(1) + '" y="' + (bot - h).toFixed(1) + '" width="' + bw.toFixed(1) +
+          '" height="' + h.toFixed(1) + '" fill="#4dabf7" opacity="0.8"/>';
+      }
+      for (i = 0; i < n; i++) {
+        var pol = t[i].slice(11, 13) === "00";
+        if (pol && i > 0) s += '<line x1="' + X(i).toFixed(1) + '" y1="' + top + '" x2="' + X(i).toFixed(1) + '" y2="' + bot + '" stroke="#999" stroke-width="0.7"/>';
+        if (pol || i === 0) {
+          var kon = i + 1; while (kon < n && t[kon].slice(11, 13) !== "00") kon++;
+          s += '<text x="' + ((X(i) + X(Math.min(kon, n - 1))) / 2).toFixed(1) + '" y="' + (H - 2) +
+            '" font-size="9" fill="#444" text-anchor="middle">' + DNI[new Date(t[i].slice(0, 10) + "T12:00:00").getDay()] + " " +
+            t[i].slice(8, 10) + "." + t[i].slice(5, 7) + "</text>";
+        }
+      }
+      var pts = [];
+      for (i = 0; i < n; i++) { if (T[i] !== null) pts.push(X(i).toFixed(1) + "," + Y(T[i]).toFixed(1)); }
+      s += '<polyline fill="none" stroke="#e03131" stroke-width="2" points="' + pts.join(" ") + '"/>';
+      s += '<line x1="' + X(iN).toFixed(1) + '" y1="' + top + '" x2="' + X(iN).toFixed(1) + '" y2="' + bot +
+        '" stroke="#222" stroke-dasharray="3,2" stroke-width="1"/>';
+      if (T[iN] !== null) s += '<circle cx="' + X(iN).toFixed(1) + '" cy="' + Y(T[iN]).toFixed(1) + '" r="3" fill="#e03131"/>';
+      s += '<text x="' + (L - 3) + '" y="' + (top + 3) + '" font-size="9" fill="#e03131" text-anchor="end">' + tmax + '°</text>' +
+        '<text x="' + (L - 3) + '" y="' + bot + '" font-size="9" fill="#e03131" text-anchor="end">' + tmin + '°</text>' +
+        '<text x="' + (R - 2) + '" y="9" font-size="8" fill="#555" text-anchor="end">°C / opad mm</text></svg>';
+      var g = e("div", "width:100%;height:100%");
+      g.innerHTML = s;
+      k.appendChild(g);
+    });
+  }
   function budujPogode(b, n) {
-    var t = document.getElementById("gdynia-pogoda"), w = document.getElementById("gdynia-wykres");
-    var svg = w && w.querySelector("svg");
-    if (!t || !t.children.length || !svg) {
+    var t = document.getElementById("gdynia-pogoda");
+    if (!t || !t.children.length) {
       b.className = "tr";
       b.textContent = "Ładowanie pogody…";
-      if ((n || 0) < 6) {
-        setTimeout(function () { if (otwarte && b.isConnected) budujPogode(b, (n || 0) + 1); }, 2000);
-      }
+      if ((n || 0) < 6) setTimeout(function () { if (otwarte && b.isConnected) budujPogode(b, (n || 0) + 1); }, 2000);
       return;
     }
     b.className = "tr pol";
     b.textContent = "";
-    var lewy = e("div", "font-size:12px");
+    var lewy = e("div", "font-size:11px;overflow:hidden");
     var kt = t.cloneNode(true);
     kt.removeAttribute("id");
-    kt.style.cssText = "border:0;margin:0;padding:0;font-size:12px";
+    kt.style.cssText = "border:0;margin:0;padding:0;font-size:11px";
     lewy.appendChild(kt);
     var prawy = e("div");
-    var ks = svg.cloneNode(true);
-    ks.removeAttribute("style");
-    prawy.appendChild(ks);
     b.appendChild(lewy);
     b.appendChild(prawy);
-  }
-
-  // ---------- Kafel 7: drony i rakiety, 24 h - tylko wykres dopasowany do kafla ----------
-  function budujDrony(b) {
-    b.className = "tr bez";
-    pobierz(BAZA + "historia_ruchu.json?t=" + Math.floor(Date.now() / 60000)).then(function (h) {
-      var DR = { uav: 1, recon: 1, missile: 1, ballistic: 1 }, KR = { missile: 1, ballistic: 1 };
-      var teraz = Date.now() / 1000, od = teraz - 86400, v = [], ev = [], poprz = {};
-      (h.snapshoty || []).forEach(function (x, i) {
-        if (x.bn) return;
-        var suma = 0, ids = {};
-        (x.n || []).forEach(function (r) {
-          if (r[7] || !DR[r[1]]) return;
-          suma += r[6] > 0 ? r[6] : 1;
-          var k = r[0] || (r[1] + Math.round(r[2] * 10) + "_" + Math.round(r[3] * 10));
-          ids[k] = 1;
-          if (i > 0 && KR[r[1]] && !poprz[k]) ev.push(x.t);
-        });
-        v.push([x.t, suma]);
-        poprz = ids;
-      });
-      v = v.filter(function (p) { return p[0] >= od; });
-      if (v.length < 2) { b.className = "tr"; b.textContent = "Za mało danych historii (zapisów: " + v.length + ")."; return; }
-      var sr = v.map(function (p) {
-        var o = v.filter(function (q) { return q[0] <= p[0] && q[0] >= p[0] - 1800; });
-        return [p[0], o.reduce(function (s, q) { return s + q[1]; }, 0) / o.length];
-      });
-      var mx = v.reduce(function (a, p) { return p[1] > a[1] ? p : a; }, v[0]);
-      var W = Math.max(200, b.clientWidth || 300), H = Math.max(70, b.clientHeight || 100);
-      var t0 = Math.max(v[0][0], od), maxY = Math.max(4, Math.ceil(mx[1] * 1.1));
-      var L = 26, R = W - 6, top = 15, bot = H - 15;
-      function X(t) { return L + (t - t0) / (teraz - t0) * (R - L); }
-      function Y(y) { return bot - y / maxY * (bot - top); }
-      var s = '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none">';
-      [0, maxY / 2, maxY].forEach(function (g) {
-        s += '<line x1="' + L + '" y1="' + Y(g).toFixed(1) + '" x2="' + R + '" y2="' + Y(g).toFixed(1) +
-          '" stroke="#ccc" stroke-width="0.7"/><text x="' + (L - 3) + '" y="' + (Y(g) + 3).toFixed(1) +
-          '" font-size="9" fill="#555" text-anchor="end">' + (Math.round(g * 10) / 10) + "</text>";
-      });
-      var krok = W < 260 ? 6 : 3;
-      var dt = new Date(t0 * 1000); dt.setMinutes(0, 0, 0);
-      for (var t = dt.getTime() / 1000; t <= teraz; t += 3600) {
-        if (t < t0 || new Date(t * 1000).getHours() % krok) continue;
-        s += '<text x="' + X(t).toFixed(1) + '" y="' + (H - 3) + '" font-size="9" fill="#555" text-anchor="middle">' +
-          new Date(t * 1000).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) + "</text>";
-      }
-      v.forEach(function (p) {
-        s += '<line x1="' + X(p[0]).toFixed(1) + '" y1="' + bot + '" x2="' + X(p[0]).toFixed(1) + '" y2="' + Y(p[1]).toFixed(1) +
-          '" stroke="#ff922b" stroke-width="2" opacity="0.6"/>';
-      });
-      s += '<polyline fill="none" stroke="#333" stroke-width="1.8" points="' +
-        sr.map(function (p) { return X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1); }).join(" ") + '"/>';
-      ev.filter(function (x) { return x >= t0; }).forEach(function (x) {
-        s += '<circle cx="' + X(x).toFixed(1) + '" cy="' + (bot + 6) + '" r="2.4" fill="#e03131"/>';
-      });
-      var ost = v[v.length - 1][1], srAll = Math.round(v.reduce(function (a, p) { return a + p[1]; }, 0) / v.length);
-      var pig = ost + " · śr. " + srAll, pw = pig.length * 5.6 + 10;
-      s += '<rect x="' + (R - pw) + '" y="1" width="' + pw + '" height="13" rx="6" fill="rgba(0,0,0,0.75)"/>' +
-        '<text x="' + (R - pw / 2) + '" y="10.5" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle">' + pig + "</text></svg>";
-      b.textContent = "";
-      var g = e("div", "width:100%;height:100%");
-      g.innerHTML = s;
-      b.appendChild(g);
-    }).catch(function () { brak(b); });
+    rysujPogode(prawy);
   }
 
   // ---------- Otwieranie, zamykanie, odswiezanie ----------
+  function zatrzymajTimer() { if (timer) { clearInterval(timer); timer = null; } }
   function zamknij() {
     otwarte = false;
+    zatrzymajTimer();
     kont.style.display = "none";
     kont.className = "";
     kont.textContent = "";
+    UI = null;
     document.body.classList.remove("kafle-dock");
     btn.classList.remove("akt");
   }
@@ -326,14 +357,13 @@
   }
   function otworz() {
     var x = document.getElementById("gora-x"), gp = document.getElementById("gora-panel");
-    if (!DOCK() && x && gp && gp.style.display === "block") x.click();   // na telefonie zamknij panel u gory
+    if (!DOCK() && x && gp && gp.style.display === "block") x.click();
     kont.textContent = "";
     ciala = [kafel("Ropa i kursy"), kafel("Złoto, WIG20, paliwa"), kafel("Blisko granicy PL (24 h)"),
       kafel("Ostrzeżenia IMGW – pomorskie"),
-      kafel("Wiadomości militarne (7 dni)", "szeroki wysoki"),
-      kafel("Pogoda – Gdynia", "szeroki"),
-      kafel("Drony i rakiety – 24 godziny", "szeroki")];
-    budowniczowie = [budujKursy, budujRynekPlus, budujGranice, budujPomorskie, budujWiadomosci, budujPogode, budujDrony];
+      kafel("Wiadomości militarne (7 dni)", "szeroki wys3"),
+      kafel("Pogoda – Gdynia", "szeroki")];
+    budowniczowie = [budujKursy, budujRynekPlus, budujGranice, budujPomorskie, budujWiadomosci, budujPogode];
     var zam = e("button", "", "✕");
     zam.className = "zam";
     zam.setAttribute("aria-label", "Zamknij kafle");
@@ -344,7 +374,15 @@
     kont.style.display = "grid";
     otwarte = true;
     btn.classList.add("akt");
+    sek = 0;
     wypelnij();
+    zatrzymajTimer();
+    timer = setInterval(function () {                 // rotacja regionow co ROT sekund
+      if (!otwarte || pauza || !UI || !UI.pasek.isConnected) return;
+      sek++;
+      UI.pasek.style.width = Math.min(100, sek / ROT * 100) + "%";
+      if (sek >= ROT) nastepnyRegion();
+    }, 1000);
   }
 
   // Na komputerze dane w otwartych kaflach odswiezaja sie same (z zachowaniem przewiniecia)
