@@ -1,50 +1,27 @@
 (function () {
-  // 1. Style CSS (dopasowane do ciemnego/jasnego motywu Twojej mapy)
   const style = document.createElement("style");
   style.textContent = `
-    #fire-btn {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      z-index: 15;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 2px solid #e03131;
-      background: rgba(255, 255, 255, 0.95);
-      font-size: 20px;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.2s, background 0.2s;
-    }
-    #fire-btn.aktywny-ogien {
-      background: #e03131;
-      color: #fff;
-      transform: scale(1.08);
-    }
     #live-feed-panel {
       position: fixed;
-      top: 62px;
-      right: 10px;
-      width: 340px;
-      max-width: calc(100vw - 20px);
-      max-height: 75vh;
-      z-index: 15;
-      background: rgba(20, 22, 27, 0.96);
+      top: 8px;
+      left: 52px;
+      right: 56px;
+      max-width: 420px;
+      max-height: calc(100dvh - 110px);
+      z-index: 7;
+      background: rgba(20, 22, 27, 0.94);
+      backdrop-filter: blur(4px);
       color: #f1f3f5;
       border-radius: 10px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.45);
       display: none;
       flex-direction: column;
       overflow: hidden;
-      font-family: sans-serif;
+      font: 13px sans-serif;
     }
     .feed-header {
-      padding: 10px 12px;
-      background: #111317;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.4);
       font-weight: bold;
       font-size: 13px;
       display: flex;
@@ -54,19 +31,20 @@
     }
     .feed-filtry {
       display: flex;
+      flex-wrap: wrap;
       gap: 4px;
       padding: 6px 10px;
-      background: #181a20;
+      background: rgba(255,255,255,0.04);
       border-bottom: 1px solid #2c2e33;
     }
     .feed-filtry button {
-      flex: 1;
+      flex: 1 1 auto;
       background: #25262b;
       color: #ccc;
       border: 1px solid #373a40;
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 11px;
-      padding: 5px 2px;
+      padding: 4px 6px;
       cursor: pointer;
     }
     .feed-filtry button.aktywny-filtr {
@@ -90,7 +68,7 @@
     .feed-card:hover { background: #2c2e33; }
     .feed-card img {
       width: 100%;
-      max-height: 160px;
+      max-height: 150px;
       object-fit: cover;
       border-radius: 4px;
       margin: 6px 0;
@@ -103,31 +81,42 @@
   `;
   document.head.appendChild(style);
 
-  // 2. Wstrzyknięcie przycisku 🔥 i panelu HTML
-  const container = document.createElement("div");
-  container.innerHTML = `
-    <button id="fire-btn" title="Live OSINT Feed (Bałtyk · Ormuz · Morze Czerwone)">🔥</button>
-    <div id="live-feed-panel">
-      <div class="feed-header">
-        <span>🔥 LIVE OSINT FEED</span>
-        <button id="close-feed" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;">✕</button>
-      </div>
-      <div class="feed-filtry">
-        <button data-region="ALL" class="aktywny-filtr">Wszystkie</button>
-        <button data-region="Bałtyk">Bałtyk</button>
-        <button data-region="Izrael / Lewant">Izrael</button>
-        <button data-region="Ormuz">Ormuz</button>
-        <button data-region="Morze Czerwone">Huti / Bab</button>
-        <button data-region="Ukraina / M. Czarne">Ukraina</button>
-      </div>
-      <div id="feed-list">Ładowanie raportów...</div>
-    </div>
-  `;
-  document.body.appendChild(container);
+  // Tworzymy przycisk w stylu ikony_menu.js i doklejamy do #lewa
+  const lewa = document.getElementById("lewa");
+  const fireBtn = document.createElement("button");
+  fireBtn.id = "fire-btn";
+  fireBtn.className = "ikona-menu";
+  fireBtn.textContent = "🔥";
+  fireBtn.title = "Live OSINT Feed";
+  fireBtn.setAttribute("aria-label", "Live OSINT Feed");
 
-  // 3. Logika działania i integracja z MapLibre (zmienna `map`)
-  const fireBtn = document.getElementById("fire-btn");
-  const feedPanel = document.getElementById("live-feed-panel");
+  if (lewa) {
+    lewa.appendChild(fireBtn);
+  } else {
+    fireBtn.style.cssText = "position:fixed;top:10px;right:10px;z-index:15;";
+    document.body.appendChild(fireBtn);
+  }
+
+  // Panel raportow
+  const feedPanel = document.createElement("div");
+  feedPanel.id = "live-feed-panel";
+  feedPanel.innerHTML = `
+    <div class="feed-header">
+      <span>🔥 LIVE OSINT FEED</span>
+      <button id="close-feed" style="background:none;border:0;color:#aaa;font-size:20px;line-height:1;cursor:pointer;">×</button>
+    </div>
+    <div class="feed-filtry">
+      <button data-region="ALL" class="aktywny-filtr">Wszystkie</button>
+      <button data-region="Bałtyk">Bałtyk</button>
+      <button data-region="Izrael">Izrael</button>
+      <button data-region="Ormuz">Ormuz</button>
+      <button data-region="Morze Czerwone">Huti</button>
+      <button data-region="Ukraina">Ukraina</button>
+    </div>
+    <div id="feed-list">Ładowanie raportów...</div>
+  `;
+  document.body.appendChild(feedPanel);
+
   const feedList = document.getElementById("feed-list");
   let feedActive = false;
   let allEvents = [];
@@ -139,13 +128,20 @@
     osintMarkers = [];
   }
 
+  function zamknijFeed() {
+    feedActive = false;
+    fireBtn.classList.remove("akt");
+    feedPanel.style.display = "none";
+    clearMarkers();
+  }
+
   function renderFeed() {
     clearMarkers();
     feedList.innerHTML = "";
 
     const filtered = activeRegion === "ALL"
       ? allEvents
-      : allEvents.filter(ev => ev.region === activeRegion);
+      : allEvents.filter(ev => ev.region && ev.region.includes(activeRegion));
 
     if (!filtered.length) {
       feedList.innerHTML = '<p style="font-size:12px;color:#888;padding:6px;">Brak raportów dla wybranego regionu.</p>';
@@ -153,7 +149,6 @@
     }
 
     filtered.forEach(ev => {
-      // Dodaj pinezkę 🔥 na mapę MapLibre (uwaga: MapLibre używa [lon, lat])
       if (typeof map !== "undefined" && ev.lon && ev.lat) {
         const el = document.createElement("div");
         el.className = "osint-marker";
@@ -179,7 +174,6 @@
         osintMarkers.push(marker);
       }
 
-      // Dodaj kartę do panelu bocznego
       const card = document.createElement("div");
       card.className = "feed-card";
       const timeStr = ev.date ? new Date(ev.date).toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
@@ -213,24 +207,33 @@
       allEvents = await res.json();
       renderFeed();
     } catch (e) {
-      feedList.innerHTML = '<p style="font-size:12px;color:#ff8787;padding:6px;">Brak pliku <b>feed.json</b>. Uruchom najpierw GitHub Action w zakładce Actions.</p>';
+      feedList.innerHTML = '<p style="font-size:12px;color:#ff8787;padding:6px;">Brak pliku <b>feed.json</b>.</p>';
     }
   }
 
   fireBtn.addEventListener("click", () => {
-    feedActive = !feedActive;
-    fireBtn.classList.toggle("aktywny-ogien", feedActive);
-    feedPanel.style.display = feedActive ? "flex" : "none";
-    if (feedActive) loadOsintFeed();
-    else clearMarkers();
+    if (feedActive) {
+      zamknijFeed();
+    } else {
+      // Zamykamy ewentualnie otwarty panel z ikony_menu.js
+      const goraX = document.getElementById("gora-x");
+      if (goraX) goraX.click();
+
+      feedActive = true;
+      fireBtn.classList.add("akt");
+      feedPanel.style.display = "flex";
+      loadOsintFeed();
+    }
   });
 
-  document.getElementById("close-feed").addEventListener("click", () => {
-    feedActive = false;
-    fireBtn.classList.remove("aktywny-ogien");
-    feedPanel.style.display = "none";
-    clearMarkers();
-  });
+  // Jesli uzytkownik kliknie inna ikone w #lewa, chowamy panel Live Feed
+  if (lewa) {
+    lewa.addEventListener("click", (e) => {
+      if (e.target !== fireBtn && feedActive) zamknijFeed();
+    });
+  }
+
+  document.getElementById("close-feed").addEventListener("click", zamknijFeed);
 
   document.querySelectorAll(".feed-filtry button").forEach(btn => {
     btn.addEventListener("click", () => {
