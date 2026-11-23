@@ -11,7 +11,6 @@ import websockets
 KLUCZ = os.environ.get("AISSTREAM_API_KEY", "")
 CZAS_NASLUCHU = 240
 PLIK = os.environ.get("PLIK_WYJSCIOWY", "statki.geojson")
-# Polskie wybrzeze i Zatoka Gdanska: [[szer_min, dl_min], [szer_max, dl_max]]
 OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.8, 14.0], [55.2, 20.0]]]"))
 MAX_WIEK = timedelta(hours=6)
 
@@ -43,7 +42,9 @@ def wczytaj_stare():
     statki = {}
     for ft in dane.get("features", []):
         p = dict(ft["properties"])
-        p["lon"], p["lat"] = ft["geometry"]["coordinates"]
+        coords = ft["geometry"]["coordinates"]
+        p["lon"] = coords[0]
+        p["lat"] = coords[1]
         statki[str(p["mmsi"])] = p
     return statki
 
@@ -66,15 +67,19 @@ def czy_baltyk():
 
 def pobierz_json_url(url):
     req = urllib.request.Request(url, headers={
-        "Digitraffic-User": "HomontosMapa1/1.0",
+        "Accept": "application/json;charset=UTF-8",
         "Accept-Encoding": "gzip",
-        "User-Agent": "Mozilla/5.0"
+        "Digitraffic-User": "HomontosMapa1/1.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     })
     with urllib.request.urlopen(req, timeout=30) as resp:
         raw = resp.read()
         if resp.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
             raw = gzip.decompress(raw)
-        return json.loads(raw.decode("utf-8"))
+        tekst = raw.decode("utf-8").strip()
+        if not tekst:
+            raise ValueError(f"Pusta odpowiedz z {url} (status {resp.status})")
+        return json.loads(tekst)
 
 
 def pobierz_digitraffic(statki):
@@ -94,7 +99,8 @@ def pobierz_digitraffic(statki):
         coords = (ft.get("geometry") or {}).get("coordinates") or []
         if len(coords) < 2:
             continue
-        lon, lat = coords[0], coords[1]
+        lon = coords[0]
+        lat = coords[1]
         if not w_obszarze(lat, lon):
             continue
 
