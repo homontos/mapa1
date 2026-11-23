@@ -4,6 +4,7 @@ import gzip
 import io
 import json
 import os
+import socket
 import time
 import urllib.request
 from datetime import datetime, timezone, timedelta
@@ -11,13 +12,13 @@ from datetime import datetime, timezone, timedelta
 import websockets
 
 KLUCZ = os.environ.get("AISSTREAM_API_KEY", "")
-CZAS_NASLUCHU = 180
+CZAS_NASLUCHU = 270
 PLIK = os.environ.get("PLIK_WYJSCIOWY", "statki.geojson")
 PLIK_TRASY = "flota_cieni_trasy.geojson"
 PLIK_SANKCJE = "flota_cieni_lista.json"
 
-OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.5, 10.0], [59.5, 22.5]]]"))
-MAX_WIEK = timedelta(hours=6)
+OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.5, 9.5], [66.0, 30.5]]]"))
+MAX_WIEK = timedelta(hours=12)
 MAX_WIEK_TRASY = timedelta(hours=48)
 
 POZYCJE = ("PositionReport", "StandardClassBPositionReport",
@@ -54,9 +55,6 @@ def czy_baltyk():
     return False
 
 
-def re_split_ids(val):
-    return [x.strip() for x in val.replace(",", ";").split(";") if x.strip().isdigit()]
-
 def pobierz_lista_floty_cieni():
     try:
         if os.path.exists(PLIK_SANKCJE):
@@ -69,7 +67,7 @@ def pobierz_lista_floty_cieni():
     except Exception:
         pass
 
-    print("Pobieram aktualna liste sankcyjna statkow z OpenSanctions (entities.ftm.json)...")
+    print("Pobieram aktualna liste sankcyjna statkow z OpenSanctions...")
     host = ".".join(["data", "opensanctions", "org"])
     url = "/".join(["https:", "", host, "datasets", "latest", "sanctions", "entities.ftm.json"])
     sankcje = {"mmsi": {}, "imo": {}}
@@ -101,7 +99,8 @@ def pobierz_lista_floty_cieni():
     except Exception as e:
         print("Info: nie udalo sie pobrac OpenSanctions:", e)
     return sankcje
-           
+
+
 def oznacz_flote_cieni(s, sankcje):
     mmsi = str(s.get("mmsi") or "")
     imo = str(s.get("imo") or "")
@@ -142,6 +141,117 @@ def wczytaj_stare():
     return statki
 
 
+def _ais_6bit_str(bits):
+    out = []
+    for i in range(0, len(bits) - 5, 6):
+        v = int(bits[i:i + 6], 2)
+        out.append(chr(v + 64) if v < 32 else chr(v))
+    return "".join(out).replace("@", " ").strip()
+
+
+def _s_int(bits):
+    v = int(bits, 2)
+    return v - (1 << len(bits)) if bits == "1" else v
+
+
+def pobierz_dma_dania(statki, sekundy=20):
+    host = ".".join(["aisdata", "ais", "dk"])
+    print(f"Pobieram dane AIS z Dunskiej Administracji Morskiej ({host}:6501)...")
+    teraz_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    fragmenty = {}
+    zaktualizowane = set()
+
+    with socket.create_connection((host, 6501), timeout=12) as sock:
+        sock.settimeout(5)
+        koniec = time.time() + sekundy
+        buf = ""
+        while time.time() < koniec:
+            try:
+                chunk = sock.recv(4096).decode("ascii", errors="ignore")
+                if not chunk:
+                    break
+                buf += chunk
+            except socket.timeout:
+                break
+
+            while "\n" in buf:
+                line, buf = buf.split("\n", 1)
+                idx = line.find("!AIVDM")
+                if idx == -1:
+                    continue
+                parts = line[idx:].split("*").split(",")
+                if len(parts) < 6:
+                    continue
+                try:
+                    total = int(parts)
+                    num = int(parts)
+                    seq = parts
+                    payload = parts
+                except ValueError:
+                    continue
+
+                if total > 1:
+                    key = (seq, total)
+                    fragmenty.setdefault(key, {})[num] = payload
+                    if len(fragmenty[key]) < total:
+                        continue
+                    payload = "".join(fragmenty.pop(key)[i] for i in range(1, total + 1))
+
+                bits = "".join(
+                    f"{(ord(c) - 48 - (8 if ord(c) - 48 > 40 else 0)):06b}"
+                    for c in payload
+                )
+                if len(bits) < 38:
+                    continue
+                msg_type = int(bits[0:6], 2)
+                mmsi = str(int(bits[8:38], 2))
+
+                if msg_type in (1, 2, 3) and len(bits) >= 128:
+                    sog = int(bits[50:60], 2) / 10.0
+                    lon = _s_int(bits[61:89]) / 600000.0
+                    lat = _s_int(bits[89:116]) / 600000.0
+                    cog = int(bits[116:128], 2) / 10.0
+                    if 53.5 <= lat <= 60.0 and 9.5 <= lon <= 20.5:
+                        s = statki.setdefault(mmsi, {"mmsi": mmsi})
+                        s["lat"] = round(lat, 5)
+                        s["lon"] = round(lon, 5)
+                        if sog < 102.0:
+                            s["predkosc"] = sog
+                        if cog < 360.0:
+                            s["kurs"] = cog
+                        s["aktualizacja"] = teraz_iso
+                        zaktualizowane.add(mmsi)
+                elif msg_type == 18 and len(bits) >= 124:
+                    sog = int(bits[46:56], 2) / 10.0
+                    lon = _s_int(bits[57:85]) / 600000.0
+                    lat = _s_int(bits[85:112]) / 600000.0
+                    cog = int(bits[112:124], 2) / 10.0
+                    if 53.5 <= lat <= 60.0 and 9.5 <= lon <= 20.5:
+                        s = statki.setdefault(mmsi, {"mmsi": mmsi})
+                        s["lat"] = round(lat, 5)
+                        s["lon"] = round(lon, 5)
+                        if sog < 102.0:
+                            s["predkosc"] = sog
+                        if cog < 360.0:
+                            s["kurs"] = cog
+                        s["aktualizacja"] = teraz_iso
+                        zaktualizowane.add(mmsi)
+                elif msg_type == 5 and len(bits) >= 422:
+                    s = statki.setdefault(mmsi, {"mmsi": mmsi})
+                    imo = int(bits[40:70], 2)
+                    if imo > 0:
+                        s["imo"] = str(imo)
+                    nazwa = _ais_6bit_str(bits[112:232])
+                    if nazwa:
+                        s["nazwa"] = nazwa
+                    opis = opis_typu(int(bits[232:240], 2))
+                    if opis and s.get("typ") != "Flota Cieni":
+                        s["typ"] = opis
+                    cel = _ais_6bit_str(bits[302:422])
+                    if cel:
+                        s["cel"] = cel
+
+    print(f"DMA (Dania / Bornholm): zaktualizowano {len(zaktualizowane)} statkow.")
 def pobierz_json_url(url):
     req = urllib.request.Request(url, headers={
         "Accept": "application/json",
@@ -158,7 +268,7 @@ def pobierz_json_url(url):
 
 
 def pobierz_digitraffic_caly_baltyk(statki):
-    print("Pobieram WSZYSTKIE statki z Digitraffic (caly Baltyk)...")
+    print("Pobieram statki z Digitraffic (HELCOM)...")
     host = ".".join(["meri", "digitraffic", "fi"])
     base = "/".join(["https:", "", host, "api", "ais", "v1"])
     lokacje = pobierz_json_url(base + "/locations")
@@ -209,7 +319,9 @@ def pobierz_digitraffic_caly_baltyk(statki):
                 s["typ"] = opis
         dodane += 1
 
-    print(f"Digitraffic: pobrano {dodane} statkow z calego Baltyku.")
+    print(f"Digitraffic: pobrano {dodane} statkow.")
+
+
 async def nasluchuj_aisstream(statki):
     if not KLUCZ:
         return
@@ -218,7 +330,7 @@ async def nasluchuj_aisstream(statki):
 
     for proba in range(1, 3):
         try:
-            print(f"AISStream (poludniowy Baltyk): proba {proba}/2...")
+            print(f"AISStream: proba {proba}/2 (nasluch {CZAS_NASLUCHU}s)...")
             async with websockets.connect(
                 ws_url,
                 open_timeout=25,
@@ -387,6 +499,10 @@ statki = wczytaj_stare()
 sankcje = pobierz_lista_floty_cieni()
 
 if czy_baltyk():
+    try:
+        pobierz_dma_dania(statki, sekundy=20)
+    except Exception as e:
+        print("Info DMA (Dania):", e)
     try:
         pobierz_digitraffic_caly_baltyk(statki)
     except Exception as e:
