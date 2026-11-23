@@ -35,7 +35,6 @@
       paint: {
         "line-color": "#9c36b5",
         "line-width": 3,
-        "line-dasharray":,
         "line-opacity": 0.9
       }
     });
@@ -43,7 +42,7 @@
     // Dymek po kliknieciu w fioletowa linie trasy
     map.on("click", "warstwa-trasy-floty-cieni", function (e) {
       if (!e.features || !e.features.length) return;
-      const p = e.features[0].properties || {};
+      const p = (e.features && e.features.properties) || {};
       const html = `
         <div style="font-family:sans-serif;font-size:12px;color:#222;max-width:240px;">
           <div style="font-weight:bold;color:#862e9c;margin-bottom:4px;">⛴️ ${p.nazwa || p.mmsi}</div>
