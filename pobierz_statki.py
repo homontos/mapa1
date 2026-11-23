@@ -101,19 +101,7 @@ def pobierz_lista_floty_cieni():
     except Exception as e:
         print("Info: nie udalo sie pobrac OpenSanctions:", e)
     return sankcje
-    print("Pobieram aktualna liste sankcyjna statkow z OpenSanctions...")
-    host = ".".join(["data", "opensanctions", "org"])
-    url = "/".join(["https:", "", host, "datasets", "latest", "sanctions", "targets.simple.csv"])
-    sankcje = {"mmsi": {}, "imo": {}}
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            tekst = resp.read().decode("utf-8", errors="replace")
-        reader = csv.DictReader(io.StringIO(tekst))
-        for row in reader:
-            if row.get("schema") != "
-
-
+           
 def oznacz_flote_cieni(s, sankcje):
     mmsi = str(s.get("mmsi") or "")
     imo = str(s.get("imo") or "")
