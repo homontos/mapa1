@@ -1,6 +1,6 @@
 (function () {
   var SZER_DYMKA = 340;     // szerokosc dymkow z ikon na komputerze (px)
-  var MAX_WYS = 430;        // maksymalna wysokosc dymkow z ikon (px)
+  var MAX_WYS = 280;        // maksymalna wysokosc dymkow z ikon (px)
 
   // ---------- Punkt 6: mniejsze dymki z ikon na komputerze ----------
   var st = document.createElement("style");
