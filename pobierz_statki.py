@@ -70,7 +70,7 @@ def pobierz_lista_floty_cieni():
 
     print("Pobieram aktualna liste sankcyjna statkow z OpenSanctions...")
     host = ".".join(["data", "opensanctions", "org"])
-    url = "/".join(["https:", "", host, "datasets", "latest", "maritime", "targets.simple.csv"])
+    url = "/".join(["https:", "", host, "datasets", "latest", "sanctions", "targets.simple.csv"])
     sankcje = {"mmsi": {}, "imo": {}}
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
