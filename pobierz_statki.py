@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 import websockets
 
 KLUCZ = os.environ.get("AISSTREAM_API_KEY", "")
-CZAS_NASLUCHU = 240
+CZAS_NASLUCHU = 180
 PLIK = os.environ.get("PLIK_WYJSCIOWY", "statki.geojson")
 OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.8, 14.0], [55.2, 20.0]]]"))
 MAX_WIEK = timedelta(hours=6)
@@ -82,27 +82,25 @@ def pobierz_json_url(url):
 
 
 def pobierz_digitraffic(statki):
-    print("Pobieram dane AIS dla Baltyku z Digitraffic (HELCOM)...")
+    print("Pobieram pelny zestaw AIS z Digitraffic (HELCOM)...")
     host = ".".join(["meri", "digitraffic", "fi"])
     base = "/".join(["https:", "", host, "api", "ais", "v1"])
-    url_lok = base + "/locations?latitude=54.6&longitude=18.5&radius=350"
-    url_ves = base + "/vessels"
-
-    lokacje = pobierz_json_url(url_lok)
+    # Pelny endpoint bez radius zwraca wszystkie statki z calego Baltyku
+    lokacje = pobierz_json_url(base + "/locations")
+    metadane = pobierz_json_url(base + "/vessels")
 
     meta_mapa = {}
-    try:
-        metadane = pobierz_json_url(url_ves)
-        for m in metadane:
-            mmsi = str(m.get("mmsi", ""))
-            if mmsi:
-                meta_mapa[mmsi] = m
-    except Exception as e_meta:
-        print("Info: nie pobrano nazw statkow:", e_meta)
+    for m in metadane:
+        mmsi = str(m.get("mmsi", ""))
+        if mmsi:
+            meta_mapa[mmsi] = m
 
     teraz_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    wszystkie = lokacje.get("features", [])
+    print("Digitraffic lacznie statkow na Baltyku:", len(wszystkie))
+
     dodane = 0
-    for ft in lokacje.get("features", []):
+    for ft in wszystkie:
         coords = (ft.get("geometry") or {}).get("coordinates") or []
         if len(coords) < 2:
             continue
@@ -137,7 +135,8 @@ def pobierz_digitraffic(statki):
                 s["typ"] = opis
         dodane += 1
 
-    print(f"Digitraffic: zaktualizowano {dodane} statkow w obszarze.")
+    print(f"Digitraffic: w Twoim prostokacie OBSZAR znaleziono {dodane} statkow.")
+    return dodane
 
 
 async def nasluchuj_aisstream(statki):
@@ -145,62 +144,70 @@ async def nasluchuj_aisstream(statki):
         raise RuntimeError("Brak AISSTREAM_API_KEY")
     ws_host = ".".join(["stream", "aisstream", "io"])
     ws_url = "/".join(["wss:", "", ws_host, "v0", "stream"])
-    async with websockets.connect(
-        ws_url,
-        open_timeout=25,
-        close_timeout=10
-    ) as ws:
-        await ws.send(json.dumps({
-            "APIKey": KLUCZ,
-            "BoundingBoxes": OBSZAR,
-            "FilterMessageTypes": TYPY_KOMUNIKATOW,
-        }))
-        koniec = time.time() + CZAS_NASLUCHU
-        while time.time() < koniec:
-            try:
-                surowe = await asyncio.wait_for(
-                    ws.recv(), timeout=max(1, koniec - time.time()))
-            except asyncio.TimeoutError:
-                break
-            msg = json.loads(surowe)
-            meta = msg.get("MetaData", {})
-            mmsi = str(meta.get("MMSI", ""))
-            if not mmsi:
-                continue
-            typ = msg.get("MessageType")
-            tresc = (msg.get("Message") or {}).get(typ) or {}
-            s = statki.setdefault(mmsi, {"mmsi": mmsi})
-            nazwa = (meta.get("ShipName") or "").strip()
-            if nazwa:
-                s["nazwa"] = nazwa
 
-            if typ in POZYCJE:
-                s["lat"] = tresc.get("Latitude", meta.get("latitude"))
-                s["lon"] = tresc.get("Longitude", meta.get("longitude"))
-                s["predkosc"] = tresc.get("Sog")
-                s["kurs"] = tresc.get("Cog")
-                s["aktualizacja"] = datetime.now(timezone.utc).isoformat(
-                    timespec="seconds")
-                if typ == "ExtendedClassBPositionReport":
-                    opis = opis_typu(tresc.get("Type"))
-                    if opis:
-                        s["typ"] = opis
-            elif typ == "ShipStaticData":
-                cel = (tresc.get("Destination") or "").strip()
-                if cel:
-                    s["cel"] = cel
-                opis = opis_typu(tresc.get("Type"))
-                if opis:
-                    s["typ"] = opis
-            elif typ == "StaticDataReport":
-                a = tresc.get("ReportA") or {}
-                b = tresc.get("ReportB") or {}
-                nazwa_a = (a.get("Name") or "").strip()
-                if nazwa_a and "nazwa" not in s:
-                    s["nazwa"] = nazwa_a
-                opis = opis_typu(b.get("ShipType"))
-                if opis:
-                    s["typ"] = opis
+    for proba in range(1, 4):
+        try:
+            print(f"AISStream: proba polaczenia {proba}/3...")
+            async with websockets.connect(
+                ws_url,
+                open_timeout=30,
+                close_timeout=10
+            ) as ws:
+                await ws.send(json.dumps({
+                    "APIKey": KLUCZ,
+                    "BoundingBoxes": OBSZAR,
+                    "FilterMessageTypes": TYPY_KOMUNIKATOW,
+                }))
+                koniec = time.time() + CZAS_NASLUCHU
+                while time.time() < koniec:
+                    try:
+                        surowe = await asyncio.wait_for(
+                            ws.recv(), timeout=max(1, koniec - time.time()))
+                    except asyncio.TimeoutError:
+                        break
+                    msg = json.loads(surowe)
+                    meta = msg.get("MetaData", {})
+                    mmsi = str(meta.get("MMSI", ""))
+                    if not mmsi:
+                        continue
+                    typ = msg.get("MessageType")
+                    tresc = (msg.get("Message") or {}).get(typ) or {}
+                    s = statki.setdefault(mmsi, {"mmsi": mmsi})
+                    nazwa = (meta.get("ShipName") or "").strip()
+                    if nazwa:
+                        s["nazwa"] = nazwa
+
+                    if typ in POZYCJE:
+                        s["lat"] = tresc.get("Latitude", meta.get("latitude"))
+                        s["lon"] = tresc.get("Longitude", meta.get("longitude"))
+                        s["predkosc"] = tresc.get("Sog")
+                        s["kurs"] = tresc.get("Cog")
+                        s["aktualizacja"] = datetime.now(timezone.utc).isoformat(
+                            timespec="seconds")
+                        if typ == "ExtendedClassBPositionReport":
+                            opis = opis_typu(tresc.get("Type"))
+                            if opis:
+                                s["typ"] = opis
+                    elif typ == "ShipStaticData":
+                        cel = (tresc.get("Destination") or "").strip()
+                        if cel:
+                            s["cel"] = cel
+                        opis = opis_typu(tresc.get("Type"))
+                        if opis:
+                            s["typ"] = opis
+                    elif typ == "StaticDataReport":
+                        a = tresc.get("ReportA") or {}
+                        b = tresc.get("ReportB") or {}
+                        nazwa_a = (a.get("Name") or "").strip()
+                        if nazwa_a and "nazwa" not in s:
+                            s["nazwa"] = nazwa_a
+                        opis = opis_typu(b.get("ShipType"))
+                        if opis:
+                            s["typ"] = opis
+                return
+        except Exception as e:
+            print(f"AISStream proba {proba} nieudana: {e}")
+            await asyncio.sleep(5)
 
 
 def zapisz(statki):
@@ -230,12 +237,16 @@ def zapisz(statki):
 
 
 statki = wczytaj_stare()
+ile_dt = 0
 if czy_baltyk():
     try:
-        pobierz_digitraffic(statki)
+        ile_dt = pobierz_digitraffic(statki)
     except Exception as e:
         print("Blad Digitraffic:", e)
-else:
+
+# Jesli Digitraffic nie zwrocil statkow dla samego poludnia (np. Zatoka Gdanska)
+# albo to inny region (Ormuz/Bab), uruchamiamy AISStream z 3 probami polaczenia
+if ile_dt == 0:
     try:
         asyncio.run(nasluchuj_aisstream(statki))
     except Exception as e:
