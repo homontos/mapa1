@@ -20,7 +20,7 @@ jobs:
       - run: python pobierz_statki.py
         env:
           AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
-          OBSZAR: "[[[53.5, 9.5], [66.0, 30.5]]]"
+          OBSZAR: "[[[53.7, 13.0], [55.6, 20.5]], [[54.8, 13.0], [58.0, 22.0]]]"
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
