@@ -16,7 +16,7 @@ PLIK = os.environ.get("PLIK_WYJSCIOWY", "statki.geojson")
 PLIK_TRASY = "flota_cieni_trasy.geojson"
 PLIK_SANKCJE = "flota_cieni_lista.json"
 
-OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.8, 14.0], [56.0, 21.5]]]"))
+OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.5, 10.0], [59.5, 22.5]]]"))
 MAX_WIEK = timedelta(hours=6)
 MAX_WIEK_TRASY = timedelta(hours=48)
 
