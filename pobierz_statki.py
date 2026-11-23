@@ -77,27 +77,28 @@ def pobierz_json_url(url):
         if resp.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
             raw = gzip.decompress(raw)
         tekst = raw.decode("utf-8", errors="replace").strip()
-        print(f"URL {url[:55]}... -> status {resp.status}, bajtow: {len(tekst)}")
-        if not tekst:
-            raise ValueError("Pusta odpowiedz serwera")
+        print("Pobrano URL:", url, "bajtow:", len(tekst))
         return json.loads(tekst)
 
 
 def pobierz_digitraffic(statki):
     print("Pobieram dane AIS dla Baltyku z Digitraffic (HELCOM)...")
-    # Parametry latitude, longitude, radius (w km) dla Zatoki Gdanskiej i poludniowego Baltyku
-    url_lok = "https://digitraffic.fi"
+    host = ".".join(["meri", "digitraffic", "fi"])
+    base = "/".join(["https:", "", host, "api", "ais", "v1"])
+    url_lok = base + "/locations?latitude=54.6&longitude=18.5&radius=350"
+    url_ves = base + "/vessels"
+
     lokacje = pobierz_json_url(url_lok)
 
     meta_mapa = {}
     try:
-        metadane = pobierz_json_url("https://digitraffic.fi")
+        metadane = pobierz_json_url(url_ves)
         for m in metadane:
             mmsi = str(m.get("mmsi", ""))
             if mmsi:
                 meta_mapa[mmsi] = m
     except Exception as e_meta:
-        print("Info: nie pobrano nazw statkow (vessels), zapisuje same pozycje:", e_meta)
+        print("Info: nie pobrano nazw statkow:", e_meta)
 
     teraz_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
     dodane = 0
@@ -142,8 +143,10 @@ def pobierz_digitraffic(statki):
 async def nasluchuj_aisstream(statki):
     if not KLUCZ:
         raise RuntimeError("Brak AISSTREAM_API_KEY")
+    ws_host = ".".join(["stream", "aisstream", "io"])
+    ws_url = "/".join(["wss:", "", ws_host, "v0", "stream"])
     async with websockets.connect(
-        "wss://stream.aisstream.io/v0/stream",
+        ws_url,
         open_timeout=25,
         close_timeout=10
     ) as ws:
