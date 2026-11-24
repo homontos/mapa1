@@ -2,11 +2,20 @@
   var SZER = 280;      // szerokosc panelu kafli na komputerze (px)
   var WYS = 150;       // wysokosc jednego rzedu kafli na komputerze (px)
   var ROT = 25;        // co ile sekund zmienia sie region w wiadomosciach
+  var czesci = location.pathname.split("/").filter(Boolean);
+  var BAZA = "https://raw.githubusercontent.com/" + location.hostname.split(".")[0] + "/" +
+    (czesci[0] || "") + "/dane/";
   var TLO = "rgba(224,227,231,0.93)";
   var IKONY = { rakieta: "🚀", dron: "🛸", starcie: "💥", marynarka: "⚓", alarm: "⚠️", inne: "📍" };
   var REG = ["Europa Wschodnia", "Bliski Wschód", "Azja i Pacyfik", "Afryka", "Ameryki"];
   var KOL_OST = { 1: "#f2c200", 2: "#f08c00", 3: "#e03131" };
   var DNI = ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "So"];
+  var POLSKA = [[14.12,53.93],[16.0,54.55],[17.5,54.9],[18.5,54.95],[19.6,54.55],
+    [19.9,54.4],[20.4,54.38],[22.8,54.38],[23.5,54.2],[23.55,53.9],[23.95,52.75],
+    [23.6,52.1],[23.55,51.55],[24.05,50.85],[23.5,50.4],[22.7,49.6],[22.85,49.05],
+    [22.1,49.2],[21.6,49.4],[20.3,49.35],[19.5,49.2],[18.9,49.5],[18.5,49.9],
+    [17.7,50.3],[16.9,50.4],[16.2,50.7],[15.0,51.0],[14.75,51.05],[14.7,52.0],
+    [14.55,52.6],[14.15,52.9],[14.2,53.5]];
   var lewa = document.getElementById("lewa");
   if (!lewa) return;
 
@@ -36,9 +45,8 @@
     ".kafel .tr{flex:1;overflow-y:auto;padding:4px 8px;-webkit-overflow-scrolling:touch;min-height:0}" +
     ".kafel .tr.bez{padding:0;overflow:hidden}" +
     ".kafel .tr.bez svg{width:100%;height:100%;display:block}" +
-    ".kafel .tr.pol{display:flex;gap:4px;padding:2px 4px;overflow:hidden}" +
-    ".kafel .tr.pol>div{flex:1;min-width:0;min-height:0;overflow:hidden}" +
-    ".kafel .tr.pol svg{width:100%;height:100%;display:block}" +
+    ".kafel .tr.pol{display:flex;gap:2px;padding:0 3px;overflow:hidden}" +
+    ".kafel .tr.pol>div{min-width:0;min-height:0;overflow:hidden}" +
     ".kafel .zam{position:absolute;top:2px;right:4px;border:0;background:none;font-size:18px;cursor:pointer;color:#333}" +
     ".kafel button.nw{border:0;background:rgba(0,0,0,0.12);border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer}";
   document.head.appendChild(st);
@@ -137,39 +145,79 @@
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 3: blisko granicy PL - tylko wykres ----------
-  function przechwyc(przycisk) {
-    var oryg = window.pokazSzczegoly, fly = map.flyTo, wynik = null;
-    window.pokazSzczegoly = function (t, w) { wynik = { t: t, w: w }; };
-    map.flyTo = function () {};
-    try { przycisk.click(); } catch (err) {}
-    window.pokazSzczegoly = oryg;
-    map.flyTo = fly;
-    return wynik;
+  // ---------- Kafel 3: blisko granicy PL - wykres rysowany na caly kafel ----------
+  function wPolsce(lon, lat) {
+    var w = false;
+    for (var i = 0, j = POLSKA.length - 1; i < POLSKA.length; j = i++) {
+      var xi = POLSKA[i][0], yi = POLSKA[i][1], xj = POLSKA[j][0], yj = POLSKA[j][1];
+      if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) w = !w;
+    }
+    return w;
   }
+  function dystans(lon, lat) {
+    if (wPolsce(lon, lat)) return 0;
+    var kx = 111.32 * Math.cos(lat * Math.PI / 180), ky = 110.57, min = Infinity;
+    for (var i = 0, j = POLSKA.length - 1; i < POLSKA.length; j = i++) {
+      var ax = (POLSKA[j][0] - lon) * kx, ay = (POLSKA[j][1] - lat) * ky;
+      var bx = (POLSKA[i][0] - lon) * kx, by = (POLSKA[i][1] - lat) * ky;
+      var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+      var t = l2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2)) : 0;
+      var px = ax + t * dx, py = ay + t * dy, d = Math.sqrt(px * px + py * py);
+      if (d < min) min = d;
+    }
+    return min;
+  }
+  function hhmm(t) { return new Date(t * 1000).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }); }
+
   function budujGranice(b) {
     b.className = "tr bez";
-    var p = document.getElementById("granica-odz");
-    var w = p ? przechwyc(p) : null;
-    b.textContent = "";
-    if (!w) { brak(b); return; }
     b.textContent = "Ładowanie archiwum…";
-    var n = 0;
-    var t = setInterval(function () {
-      n++;
-      var svg = w.w.querySelector("svg");
-      if (svg) {
-        clearInterval(t);
-        b.textContent = "";
-        var kopia = svg.cloneNode(true);
-        kopia.removeAttribute("style");
-        b.appendChild(kopia);
-      } else if (n > 40 || /Brak/.test(w.w.textContent)) {
-        clearInterval(t);
-        b.className = "tr";
-        b.textContent = "Brak archiwum zbliżeń (zbyt mało zapisów historii).";
+    pobierz(BAZA + "historia_ruchu.json?t=" + Math.floor(Date.now() / 60000)).then(function (h) {
+      var teraz = Date.now() / 1000, od = teraz - 86400, pkt = [];
+      (h.snapshoty || []).forEach(function (s) {
+        if (s.t < od || s.bn) return;
+        var ile = 0, mk = Infinity;
+        (s.n || []).forEach(function (r) {
+          if (r[7]) return;
+          var km = dystans(r[3], r[2]);
+          if (km > 100) return;
+          ile += r[6] > 0 ? r[6] : 1;
+          if (km < mk) mk = km;
+        });
+        pkt.push({ t: s.t, ile: ile, km: mk });
+      });
+      if (pkt.length < 2) { b.className = "tr"; b.textContent = "Za mało zapisów historii."; return; }
+      var W = Math.max(110, b.clientWidth), H = Math.max(70, b.clientHeight);
+      var maxY = Math.max(3, Math.max.apply(null, pkt.map(function (p) { return p.ile; })));
+      var L = 22, R = W - 4, top = 14, bot = H - 12, t0 = Math.max(pkt[0].t, od);
+      function X(t) { return L + (t - t0) / (teraz - t0) * (R - L); }
+      function Y(v) { return bot - v / maxY * (bot - top); }
+      var s = '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" height="100%">';
+      [0, maxY / 2, maxY].forEach(function (g) {
+        s += '<line x1="' + L + '" y1="' + Y(g).toFixed(1) + '" x2="' + R + '" y2="' + Y(g).toFixed(1) +
+          '" stroke="#bbb" stroke-width="0.7"/><text x="' + (L - 3) + '" y="' + (Y(g) + 3).toFixed(1) +
+          '" font-size="9" fill="#444" text-anchor="end">' + (Math.round(g * 10) / 10) + "</text>";
+      });
+      var krok = W < 260 ? 6 : 3, dt = new Date(t0 * 1000);
+      dt.setMinutes(0, 0, 0);
+      for (var t = dt.getTime() / 1000; t <= teraz; t += 3600) {
+        if (t < t0 || new Date(t * 1000).getHours() % krok) continue;
+        s += '<line x1="' + X(t).toFixed(1) + '" y1="' + top + '" x2="' + X(t).toFixed(1) + '" y2="' + bot +
+          '" stroke="#ddd" stroke-width="0.6"/><text x="' + X(t).toFixed(1) + '" y="' + (H - 2) +
+          '" font-size="9" fill="#444" text-anchor="middle">' + hhmm(t) + "</text>";
       }
-    }, 250);
+      var bw = Math.max(1.6, (R - L) / pkt.length * 0.85);
+      pkt.forEach(function (p) {
+        if (p.ile <= 0) return;
+        s += '<rect x="' + (X(p.t) - bw / 2).toFixed(1) + '" y="' + Y(p.ile).toFixed(1) + '" width="' + bw.toFixed(1) +
+          '" height="' + (bot - Y(p.ile)).toFixed(1) + '" fill="' + (p.km < 50 ? "#e03131" : "#f08c00") + '"/>';
+      });
+      s += '<text x="' + (L + 2) + '" y="10" font-size="10" font-weight="bold" fill="#333">obiekty ≤100 km od granicy PL, 24 h</text></svg>';
+      b.textContent = "";
+      var g = e("div", "width:100%;height:100%");
+      g.innerHTML = s;
+      b.appendChild(g);
+    }).catch(function () { brak(b); });
   }
 
   // ---------- Kafel 4: ostrzezenia IMGW - pomorskie ----------
@@ -194,9 +242,8 @@
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 5: wiadomosci militarne, regiony co 25 s ----------
+  // ---------- Kafel 5: wiadomosci militarne, regiony co ROT sekund ----------
   var iReg = 0, pauza = false, sek = 0, daneNews = [], UI = null;
-
   function zRegionu(r) { return daneNews.filter(function (z) { return z.reg === r; }); }
 
   function rysujNews() {
@@ -257,7 +304,7 @@
     }).catch(function () { brak(b); });
   }
 
-  // ---------- Kafel 6: pogoda Gdynia - tekst po lewej, wykres po prawej ----------
+  // ---------- Kafel 6: pogoda Gdynia - maly tekst po lewej, duzy wykres po prawej ----------
   var P_CACHE = null, P_T = 0;
   function pogodaDane(cb) {
     if (P_CACHE && Date.now() - P_T < 600000) { cb(P_CACHE); return; }
@@ -279,7 +326,7 @@
       t = t.slice(a, z); T = T.slice(a, z); P = P.slice(a, z); iN -= a;
       var n = t.length;
       var W = Math.max(110, k.clientWidth), H = Math.max(70, k.clientHeight);
-      var L = 22, R = W - 4, top = 12, bot = H - 13;
+      var L = 26, R = W - 3, top = 14, bot = H - 13;
       var tv = T.filter(function (x) { return x !== null; });
       var tmin = Math.floor(Math.min.apply(null, tv)) - 1, tmax = Math.ceil(Math.max.apply(null, tv)) + 1;
       var pmax = Math.max(2, Math.max.apply(null, P.map(function (x) { return x || 0; })));
@@ -287,13 +334,13 @@
       function Y(v) { return bot - (v - tmin) / (tmax - tmin) * (bot - top); }
       var s = '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" height="100%">';
       if (iN > 0) s += '<rect x="' + L + '" y="' + top + '" width="' + (X(iN) - L).toFixed(1) + '" height="' + (bot - top) + '" fill="#000" opacity="0.05"/>';
-      var bw = Math.max(1.2, (R - L) / n * 0.8);
+      var bw = Math.max(1.4, (R - L) / n * 0.85);
       for (i = 0; i < n; i++) {
         var p = P[i] || 0;
         if (p <= 0) continue;
-        var h = Math.min(1, p / pmax) * (bot - top) * 0.4;
+        var h = Math.min(1, p / pmax) * (bot - top) * 0.45;
         s += '<rect x="' + (X(i) - bw / 2).toFixed(1) + '" y="' + (bot - h).toFixed(1) + '" width="' + bw.toFixed(1) +
-          '" height="' + h.toFixed(1) + '" fill="#4dabf7" opacity="0.8"/>';
+          '" height="' + h.toFixed(1) + '" fill="#4dabf7" opacity="0.85"/>';
       }
       for (i = 0; i < n; i++) {
         var pol = t[i].slice(11, 13) === "00";
@@ -301,19 +348,19 @@
         if (pol || i === 0) {
           var kon = i + 1; while (kon < n && t[kon].slice(11, 13) !== "00") kon++;
           s += '<text x="' + ((X(i) + X(Math.min(kon, n - 1))) / 2).toFixed(1) + '" y="' + (H - 2) +
-            '" font-size="9" fill="#444" text-anchor="middle">' + DNI[new Date(t[i].slice(0, 10) + "T12:00:00").getDay()] + " " +
+            '" font-size="10" font-weight="bold" fill="#333" text-anchor="middle">' + DNI[new Date(t[i].slice(0, 10) + "T12:00:00").getDay()] + " " +
             t[i].slice(8, 10) + "." + t[i].slice(5, 7) + "</text>";
         }
       }
       var pts = [];
       for (i = 0; i < n; i++) { if (T[i] !== null) pts.push(X(i).toFixed(1) + "," + Y(T[i]).toFixed(1)); }
-      s += '<polyline fill="none" stroke="#e03131" stroke-width="2" points="' + pts.join(" ") + '"/>';
+      s += '<polyline fill="none" stroke="#e03131" stroke-width="2.2" points="' + pts.join(" ") + '"/>';
       s += '<line x1="' + X(iN).toFixed(1) + '" y1="' + top + '" x2="' + X(iN).toFixed(1) + '" y2="' + bot +
         '" stroke="#222" stroke-dasharray="3,2" stroke-width="1"/>';
-      if (T[iN] !== null) s += '<circle cx="' + X(iN).toFixed(1) + '" cy="' + Y(T[iN]).toFixed(1) + '" r="3" fill="#e03131"/>';
-      s += '<text x="' + (L - 3) + '" y="' + (top + 3) + '" font-size="9" fill="#e03131" text-anchor="end">' + tmax + '°</text>' +
-        '<text x="' + (L - 3) + '" y="' + bot + '" font-size="9" fill="#e03131" text-anchor="end">' + tmin + '°</text>' +
-        '<text x="' + (R - 2) + '" y="9" font-size="8" fill="#555" text-anchor="end">°C / opad mm</text></svg>';
+      if (T[iN] !== null) s += '<circle cx="' + X(iN).toFixed(1) + '" cy="' + Y(T[iN]).toFixed(1) + '" r="3.2" fill="#e03131"/>';
+      s += '<text x="' + (L - 3) + '" y="' + (top + 4) + '" font-size="10" font-weight="bold" fill="#e03131" text-anchor="end">' + tmax + '°</text>' +
+        '<text x="' + (L - 3) + '" y="' + bot + '" font-size="10" font-weight="bold" fill="#e03131" text-anchor="end">' + tmin + '°</text>' +
+        '<text x="' + (R - 2) + '" y="10" font-size="10" font-weight="bold" fill="#333" text-anchor="end">°C (linia) / opad mm (słupki)</text></svg>';
       var g = e("div", "width:100%;height:100%");
       g.innerHTML = s;
       k.appendChild(g);
@@ -329,12 +376,12 @@
     }
     b.className = "tr pol";
     b.textContent = "";
-    var lewy = e("div", "font-size:11px;overflow:hidden");
+    var lewy = e("div", "flex:0 0 31%;font-size:10px;line-height:1.25");
     var kt = t.cloneNode(true);
     kt.removeAttribute("id");
-    kt.style.cssText = "border:0;margin:0;padding:0;font-size:11px";
+    kt.style.cssText = "border:0;margin:0;padding:0;font-size:10px";
     lewy.appendChild(kt);
-    var prawy = e("div");
+    var prawy = e("div", "flex:1 1 0");
     b.appendChild(lewy);
     b.appendChild(prawy);
     rysujPogode(prawy);
@@ -377,7 +424,7 @@
     sek = 0;
     wypelnij();
     zatrzymajTimer();
-    timer = setInterval(function () {                 // rotacja regionow co ROT sekund
+    timer = setInterval(function () {
       if (!otwarte || pauza || !UI || !UI.pasek.isConnected) return;
       sek++;
       UI.pasek.style.width = Math.min(100, sek / ROT * 100) + "%";
@@ -405,7 +452,6 @@
   btn.addEventListener("click", function () { if (otwarte) zamknij(); else otworz(); });
   setTimeout(function () { lewa.appendChild(btn); }, 500);
 
-  // Na telefonie dotkniecie innej ikony zamyka kafle; na komputerze zostaja otwarte
   lewa.addEventListener("click", function (ev) {
     var t = ev.target;
     if (otwarte && !DOCK() && t && t.classList && t.classList.contains("ikona-menu") && t !== btn) zamknij();
