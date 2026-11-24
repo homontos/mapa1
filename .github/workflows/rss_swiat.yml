@@ -19,6 +19,9 @@ jobs:
       - run: python rss_swiat.py
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Scal wiadomosci z Telegrama (feed.json)
+        if: always()
+        run: python scal_feed.py
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
