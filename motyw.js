@@ -1,7 +1,7 @@
 (function () {
   var M = 90;        // wysokosc malych kafli na komputerze (px)
-  var N = 210;       // wysokosc kafla wiadomosci (px)
-  var P = 170;       // wysokosc kafla pogody (px)
+  var N = 252;       // wysokosc kafla wiadomosci (px)
+  var P = 153;       // wysokosc kafla pogody (px)
   var TLO = "rgba(20,24,30,0.86)";
   var TEKST = "#e9edf2";
   var CZERW = "#c92a2a";
