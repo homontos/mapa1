@@ -249,7 +249,7 @@ if kandydaci:
             nowe.append({"id": p["id"], "t": p["t"], "kraj": str(r.get("kraj", ""))[:40],
                          "reg": r["region"], "kat": r["kat"] if r.get("kat") in KATEGORIE else "inne",
                          "tekst": str(r["tekst"])[:300], "u": p["link"], "z": p["z"],
-                         "lat": round(wsp[0], 3), "lon": round(wsp[1], 3)})
+                         "lat": round(wsp[0], 3), "lon": round(wsp[1], 3), "img": p.get("img", "")})
             print("  dodane:", time.strftime("%d.%m %H:%M", time.gmtime(p["t"])), r["miejsce"], "|", p["tytul"][:50])
         ai_sukces = True
     except Exception as e:
