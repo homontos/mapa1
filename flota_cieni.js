@@ -258,9 +258,13 @@
       }
     });
   });
+function startFlotaCieni() {
+  inicjujWarstweSladu();
+  setTimeout(inicjujWarstweSladu, 1500);
+}
 
-  if (typeof map !== "undefined") {
-    if (map.loaded()) inicjujWarstweSladu();
-    else map.on("load", inicjujWarstweSladu);
-  }
-})();
+if (typeof map !== "undefined") {
+  if (map.loaded()) startFlotaCieni();
+  else map.on("load", startFlotaCieni);
+}
+
