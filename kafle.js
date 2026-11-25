@@ -1,6 +1,6 @@
 (function () {
   var SZER = 280;      // szerokosc panelu kafli na komputerze (px)
-  var WYS = 150;       // wysokosc jednego rzedu kafli na komputerze (px)
+  var WYS = 100;       // wysokosc jednego rzedu kafli na komputerze (px)
   var ROT = 25;        // co ile sekund zmienia sie region w wiadomosciach
   var czesci = location.pathname.split("/").filter(Boolean);
   var BAZA = "https://raw.githubusercontent.com/" + location.hostname.split(".")[0] + "/" +
