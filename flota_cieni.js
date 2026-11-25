@@ -76,7 +76,7 @@
       if ((src.includes("statk") || id.includes("statk")) && (w.type === "circle" || w.type === "symbol")) {
         map.on("click", id, function (e) {
           if (!e.features || !e.features.length) return;
-          var it = iter(e.features);
+          var it = e.features.values();
           var ft = it.next().value;
           var p = (ft && ft.properties) || {};
           if (p.typ !== "Flota Cieni" && !p.flota_cieni) return;
