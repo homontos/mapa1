@@ -1,8 +1,9 @@
 (function () {
   var CENTRA = { "Europa Wschodnia": [[32, 50], 4.5], "Bliski Wschód": [[45, 29], 4.5],
     "Azja i Pacyfik": [[110, 20], 3], "Afryka": [[20, 5], 3], "Ameryki": [[-80, 15], 2.5] };
-  var RZAD = 100;      // wysokosc rzedu malych kafli na komputerze (px)
+  var RZAD = 170;      // wysokosc rzedu malych kafli na komputerze (px)
   var NEWS = 280;      // szerokosc kolumny wiadomosci na komputerze (px), tyle samo co SZER w kafle.js
+  var KAM_H = 158;     // wysokosc okna kamery pod kaflem wiadomosci (px), tyle samo co w kamera_okno.js
   var kont = document.getElementById("kafle");
   if (!kont) return;
   var podazaj = false, ostatni = "";
@@ -19,7 +20,7 @@
     ".kafel h4 .ster{flex:none;display:flex;align-items:center;gap:3px}" +
     ".kafel h4 .ster button.nw{padding:1px 6px;font-size:11px;line-height:1.3}" +
     ".kafel h4 .ster input{width:15px;height:15px;margin:0 0 0 2px;accent-color:#c92a2a;cursor:pointer}" +
-    // uklad na komputerze: rzad malych kafli u gory po lewej, wiadomosci na calej wysokosci po prawej
+    // uklad na komputerze
     "@media (min-width:900px) and (hover:hover) and (pointer:fine){" +
     DOCK + "{left:52px!important;right:8px!important;top:8px!important;bottom:68px!important;" +
     "width:auto!important;max-height:none!important;overflow:visible!important;align-content:stretch!important;" +
@@ -31,12 +32,16 @@
     DOCK + " .kafel:nth-child(2){grid-column:3!important;grid-row:1!important}" +
     DOCK + " .kafel:nth-child(3){grid-column:4!important;grid-row:1!important}" +
     DOCK + " .kafel:nth-child(4){grid-column:5!important;grid-row:1!important}" +
-    DOCK + " .kafel:nth-child(5){grid-column:6!important;grid-row:1 / span 2!important}" +
-    // pogoda w malym kaflu: tekst nad wykresem
-    DOCK + " .kafel .tr.pol{flex-direction:column!important;gap:0!important}" +
-    DOCK + " .kafel .tr.pol>div:first-child{flex:0 0 auto!important;max-height:58px;overflow:hidden}" +
-    DOCK + " .kafel .tr.pol>div:first-child>div>div:first-child{display:none}" +
-    DOCK + " .kafel .tr.pol>div:last-child{flex:1 1 0!important;min-height:0}" +
+    // wiadomosci: kolumna po prawej, skrocona o miejsce na kamere, wysokosc regulowana uchwytem
+    DOCK + " .kafel:nth-child(5){grid-column:6!important;grid-row:1 / span 2!important;" +
+    "align-self:start!important;height:calc(100% - " + (KAM_H + 8) + "px);min-height:140px;max-height:100%;" +
+    "resize:vertical;overflow:hidden}" +
+    // pogoda w malym kaflu: tekst 40% po lewej, wykres 60% po prawej
+    DOCK + " .kafel .tr.pol{flex-direction:row!important;gap:4px!important;padding:2px 4px!important}" +
+    DOCK + " .kafel .tr.pol>div:first-child{flex:0 0 40%!important;max-width:40%!important;" +
+    "overflow:hidden!important;font-size:9.5px!important;line-height:1.2!important}" +
+    DOCK + " .kafel .tr.pol>div:first-child *{font-size:9.5px!important;line-height:1.2!important}" +
+    DOCK + " .kafel .tr.pol>div:last-child{flex:1 1 0!important;min-width:0!important}" +
     "}";
   document.head.appendChild(st);
 
