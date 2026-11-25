@@ -1,7 +1,7 @@
 (function () {
   var CENTRA = { "Europa Wschodnia": [[32, 50], 4.5], "Bliski Wschód": [[45, 29], 4.5],
     "Azja i Pacyfik": [[110, 20], 3], "Afryka": [[20, 5], 3], "Ameryki": [[-80, 15], 2.5] };
-  var RZAD = 170;      // wysokosc rzedu malych kafli na komputerze (px)
+  var RZAD = 100;      // wysokosc rzedu malych kafli na komputerze (px)
   var NEWS = 280;      // szerokosc kolumny wiadomosci na komputerze (px), tyle samo co SZER w kafle.js
   var kont = document.getElementById("kafle");
   if (!kont) return;
