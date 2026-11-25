@@ -102,8 +102,21 @@ def czytaj(url):
             for c in el:
                 if tag(c) == "link" and c.get("href"):
                     link = c.get("href")
-        opis = re.sub(r"<[^>]+>", " ", tekst(el, ("description", "summary", "content")))
-        wynik.append({"tytul": tekst(el, ("title",)), "link": link.strip(), "opis": opis[:250],
+        surowy = tekst(el, ("description", "summary", "content"))
+        opis = re.sub(r"<[^>]+>", " ", surowy)
+        img = ""
+        for c in el.iter():
+            u = c.get("url") or ""
+            typ = (c.get("type") or "") + (c.get("medium") or "")
+            if tag(c) in ("thumbnail", "content", "enclosure") and u.startswith("https://") and (
+                    tag(c) == "thumbnail" or "image" in typ or re.search(r"\.(jpe?g|png|webp)(\?|$)", u, re.I)):
+                img = u
+                break
+        if not img:
+            m = re.search(r'<img[^>]+src=["\'](https://[^"\']+)', surowy)
+            if m:
+                img = m.group(1)
+        wynik.append({"tytul": tekst(el, ("title",)), "link": link.strip(), "opis": opis[:250], "img": img,
                       "t": czas(tekst(el, ("pubDate", "published", "updated", "date"))),
                       "z": urllib.parse.urlparse(url).netloc.replace("www.", "")})
     return wynik
