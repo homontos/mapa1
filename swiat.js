@@ -52,12 +52,6 @@
     var a = document.createElement("a");
     a.href = ev.u; a.target = "_blank"; a.rel = "noopener";
     a.textContent = "Źródło: " + ev.z + " ↗";
-    if (ev.img && /^https:\/\//.test(ev.img)) {
-      var im = document.createElement("img");
-      im.src = ev.img; im.loading = "lazy"; im.alt = "Zdjęcie z posta";
-      im.style.cssText = "width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin:6px 0";
-      box.appendChild(im);
-    }
     a.style.fontSize = "12px";
     box.appendChild(a);
     w("Automatyczne streszczenie i tłumaczenie nagłówka (AI). Lokalizacja przybliżona. " +
