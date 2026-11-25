@@ -19,7 +19,7 @@ PLIK_SANKCJE = "flota_cieni_lista.json"
 
 OBSZAR = json.loads(os.environ.get("OBSZAR", "[[[53.5, 9.5], [66.0, 30.5]]]"))
 MAX_WIEK = timedelta(hours=12)
-MAX_WIEK_TRASY = timedelta(hours=48)
+MAX_WIEK_TRASY = timedelta(hours=72)
 
 POZYCJE = ("PositionReport", "StandardClassBPositionReport",
            "ExtendedClassBPositionReport")
