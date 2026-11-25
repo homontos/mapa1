@@ -161,14 +161,14 @@
       ["Zbiornikowiec", "#e03131"], ["Towarowy", "#1c7ed6"],
       ["Pasazerski", "#2f9e44"], ["Rybacki", "#f08c00"],
       ["Holownik", "#7048e8"], ["Zaglowka", "#0ca678"],
-      ["Jacht", "#0ca678"], ["Wojskowy", "#495057"]
+      ["Jacht", "#0ca678"], ["Wojskowy", "#495057"], ["Flota Cieni", "#fcc419"],
     ];
     const KOLOR_INNY = "#868e96";
     const LEGENDA = [
       ["Zbiornikowiec", "#e03131"], ["Towarowy", "#1c7ed6"],
       ["Pasażerski", "#2f9e44"], ["Rybacki", "#f08c00"],
       ["Holownik", "#7048e8"], ["Żaglówka / jacht", "#0ca678"],
-      ["Wojskowy", "#495057"], ["Inny / brak danych", KOLOR_INNY]
+      ["Wojskowy", "#495057"], ["Flota Cieni", "#fcc419"],["Inny / brak danych", KOLOR_INNY]
     ];
     const wyrazenieKoloru = ["match", ["coalesce", ["get", "typ"], ""]];
     KOLORY.forEach(([typ, kolor]) => wyrazenieKoloru.push(typ, kolor));
