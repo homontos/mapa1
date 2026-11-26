@@ -53,8 +53,8 @@ for url in ZRODLA:
             continue
         alt = a.get("alt_baro")
         alt = 0 if alt == "ground" else liczba(alt)
-        wg_hex[hx] = [hx, round(lat, 3), round(lon, 3), liczba(a.get("track")), alt,
-                      str(a.get("flight") or "").strip(), a.get("t") or ""]
+                wg_hex[hx] = [hx, round(lat, 3), round(lon, 3), liczba(a.get("track")), alt,
+                      str(a.get("flight") or "").strip(), a.get("t") or "", liczba(a.get("gs"))]
         dodane += 1
     zrodla_ok.append(host)
     print("Zrodlo", host, "| w Europie:", w_europie, "| nowych po scaleniu:", dodane)
