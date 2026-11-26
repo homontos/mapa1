@@ -142,6 +142,11 @@
   }
 
   function otworzKarteFlotyCieni(p, lngLat) {
+    // Zamykamy stary dymek z index.html / dymki.js, zeby nie dublowaly sie na ekranie
+    document.querySelectorAll(".maplibregl-popup:not(.cien-popup)").forEach(function (el) {
+      el.remove();
+    });
+
     var mmsi = String(p.mmsi || "");
     var imo = String(p.imo || "");
     var nazwa = (p.nazwa || ("MMSI " + mmsi)).trim();
@@ -150,18 +155,28 @@
 
     var foto = document.createElement("div");
     foto.className = "cien-foto";
-    if (imo) {
-      var img = document.createElement("img");
-      img.src = "https://marinetraffic.com" + encodeURIComponent(imo);
-      img.alt = nazwa;
+    var img = document.createElement("img");
+    img.alt = nazwa;
+    if (imo && imo !== "0") {
+      img.src = "https://vesselfinder.net" + encodeURIComponent(imo) + "-" + encodeURIComponent(mmsi) + "-0/1?v1";
       img.onerror = function () {
-        foto.textContent = "Brak zdjęcia jednostki (IMO " + imo + ")";
+        this.onerror = function () {
+          foto.textContent = "Brak zdjęcia jednostki (IMO " + imo + ")";
+        };
+        this.src = "https://vesselfinder.com" + encodeURIComponent(imo);
+      };
+      foto.appendChild(img);
+    } else if (mmsi) {
+      img.src = "https://vesselfinder.com" + encodeURIComponent(mmsi);
+      img.onerror = function () {
+        foto.textContent = "Brak zdjęcia jednostki";
       };
       foto.appendChild(img);
     } else {
-      foto.textContent = "Brak numeru IMO dla zdjęcia";
+      foto.textContent = "Brak zdjęcia jednostki";
     }
     box.appendChild(foto);
+
 
     var tyt = document.createElement("div");
     tyt.className = "cien-nazwa";
