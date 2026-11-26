@@ -426,14 +426,18 @@ def aktualizuj_historie_tras(statki):
             "sankcje": s.get("sankcje", "Flota Cieni"),
             "cel": s.get("cel", "")
         }
-        nowy_lon = round(s["lon"], 5)
-        nowy_lat = round(s["lat"], 5)
+        nowy_lon = round(float(s["lon"]), 5)
+        nowy_lat = round(float(s["lat"]), 5)
         nowy_pt = [nowy_lon, nowy_lat, teraz_iso]
+
         if not entry["punkty"]:
             entry["punkty"].append(nowy_pt)
         else:
-            ost_lon, ost_lat, _ = entry["punkty"][-1]
-            if abs(ost_lon - nowy_lon) > 0.001 or abs(ost_lat - nowy_lat) > 0.001:
+            ostatni = entry["punkty"][-1]
+            it = iter(ostatni)
+            ost_lon = float(next(it))
+            ost_lat = float(next(it))
+            if abs(ost_lon - nowy_lon) > 0.0005 or abs(ost_lat - nowy_lat) > 0.0005:
                 entry["punkty"].append(nowy_pt)
 
     features_tras = []
@@ -441,55 +445,34 @@ def aktualizuj_historie_tras(statki):
         swieze = []
         for pt in data["punkty"]:
             try:
-                p_lon, p_lat, p_ts = pt
+                it = iter(pt)
+                p_lon = float(next(it))
+                p_lat = float(next(it))
+                p_ts = str(next(it))
                 t_pt = datetime.fromisoformat(p_ts)
                 if teraz - t_pt <= MAX_WIEK_TRASY:
                     swieze.append([p_lon, p_lat, p_ts])
             except Exception:
                 pass
-        if len(swieze) >= 2:
-            coords = [[p_lon, p_lat] for p_lon, p_lat, _ in swieze]
+        if len(swieze) >= 1:
+            coords = []
+            for p in swieze:
+                it = iter(p)
+                coords.append([next(it), next(it)])
             props = dict(data["props"])
             props["punkty"] = swieze
+            geom = {"type": "LineString", "coordinates": coords} if len(coords) >= 2 else {"type": "Point", "coordinates": coords[0]}
             features_tras.append({
                 "type": "Feature",
                 "properties": props,
-                "geometry": {"type": "LineString", "coordinates": coords}
+                "geometry": geom
             })
 
     with open(PLIK_TRASY, "w", encoding="utf-8") as f:
         json.dump({"type": "FeatureCollection", "features": features_tras}, f, ensure_ascii=False)
-    print(f"Zapisano slady tras dla {len(features_tras)} jednostek Floty Cieni.")
+    ile_linii = sum(1 for f in features_tras if f["geometry"]["type"] == "LineString")
+    print(f"Zapisano slady tras: {ile_linii} linii (lacznie sledzonych jednostek: {len(features_tras)}).")
 
-
-def zapisz(statki, sankcje):
-    teraz = datetime.now(timezone.utc)
-    cechy = []
-    ile_cieni = 0
-
-    for s in statki.values():
-        if s.get("lat") is None or s.get("lon") is None:
-            continue
-        akt = s.get("aktualizacja")
-        if akt and teraz - datetime.fromisoformat(akt) > MAX_WIEK:
-            continue
-        if oznacz_flote_cieni(s, sankcje):
-            ile_cieni += 1
-        wlasc = {k: v for k, v in s.items() if k not in ("lat", "lon")}
-        cechy.append({
-            "type": "Feature",
-            "properties": wlasc,
-            "geometry": {"type": "Point", "coordinates": [s["lon"], s["lat"]]},
-        })
-
-    if len(cechy) == 0:
-        print("Brak nowych statkow (0) – zachowano dotychczasowy plik", PLIK)
-        return
-
-    with open(PLIK, "w", encoding="utf-8") as f:
-        json.dump({"type": "FeatureCollection", "features": cechy}, f,
-                  ensure_ascii=False)
-    print(f"Zapisano lacznie statkow: {len(cechy)} (w tym Flota Cieni: {ile_cieni})")
 
     if czy_baltyk():
         aktualizuj_historie_tras(statki)
