@@ -263,8 +263,8 @@ function startFlotaCieni() {
   setTimeout(inicjujWarstweSladu, 1500);
 }
 
-if (typeof map !== "undefined") {
-  if (map.loaded()) startFlotaCieni();
-  else map.on("load", startFlotaCieni);
-}
-
+  if (typeof map !== "undefined") {
+    if (map.loaded()) startFlotaCieni();
+    else map.on("load", startFlotaCieni);
+  }
+})();
