@@ -155,28 +155,25 @@
 
     var foto = document.createElement("div");
     foto.className = "cien-foto";
-    var img = document.createElement("img");
-    img.alt = nazwa;
-    if (imo && imo !== "0") {
-      img.src = "https://vesselfinder.net" + encodeURIComponent(imo) + "-" + encodeURIComponent(mmsi) + "-0/1?v1";
+    if (mmsi || (imo && imo !== "0")) {
+      var img = document.createElement("img");
+      img.alt = nazwa;
+      img.referrerPolicy = "no-referrer";
+      img.src = mmsi
+        ? "https://marinetraffic.com" + encodeURIComponent(mmsi)
+        : "https://marinetraffic.com" + encodeURIComponent(imo);
       img.onerror = function () {
-        this.onerror = function () {
-          foto.textContent = "Brak zdjęcia jednostki (IMO " + imo + ")";
-        };
-        this.src = "https://vesselfinder.com" + encodeURIComponent(imo);
-      };
-      foto.appendChild(img);
-    } else if (mmsi) {
-      img.src = "https://vesselfinder.com" + encodeURIComponent(mmsi);
-      img.onerror = function () {
-        foto.textContent = "Brak zdjęcia jednostki";
+        if (imo && imo !== "0" && this.src.indexOf("imo=") === -1) {
+          this.src = "https://marinetraffic.com" + encodeURIComponent(imo);
+        } else {
+          foto.textContent = "Brak zdjęcia jednostki w bazie";
+        }
       };
       foto.appendChild(img);
     } else {
       foto.textContent = "Brak zdjęcia jednostki";
     }
     box.appendChild(foto);
-
 
     var tyt = document.createElement("div");
     tyt.className = "cien-nazwa";
