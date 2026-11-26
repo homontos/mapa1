@@ -13,12 +13,12 @@
     for (var i = 0; i < l.length; i++) if (l[i].textContent.indexOf(emoji) === 0) return l[i];
     return null;
   }
-  // Ukrycie ikon, ktore wchodza do nowego panelu (zostaja do uzytku wewnetrznego)
   function schowaj() {
-    ["🕐", "🗄"].forEach(function (e) { var b = ikona(e); if (b) b.style.display = "none"; });
+    ["🕐", "🗄", "📈"].forEach(function (e) { var b = ikona(e); if (b) b.style.display = "none"; });
   }
   setTimeout(schowaj, 2500);
   setTimeout(schowaj, 5000);
+  setTimeout(schowaj, 9000);
 
   function czekajNaPanel(wzorzec, ms) {
     return new Promise(function (res) {
@@ -47,7 +47,91 @@
     });
   }
 
+  // ---------- Pomocnicze ----------
+  function f(x, m) { return x.toLocaleString("pl-PL", { minimumFractionDigits: m, maximumFractionDigits: m }); }
   function f1(x) { return (Math.round(x * 10) / 10).toString().replace(".", ","); }
+  function el(tag, css, txt) {
+    var x = document.createElement(tag);
+    if (css) x.style.cssText = css;
+    if (txt !== undefined) x.textContent = txt;
+    return x;
+  }
+  function pobierz(url) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+  }
+  function proc(h, ile) {
+    if (h.length < 2) return null;
+    var k = h[h.length - 1][1], s = h[Math.max(0, h.length - 1 - ile)][1];
+    return (k - s) / s * 100;
+  }
+  function zm(p) { return p === null ? "–" : (p >= 0 ? "▲ +" : "▼ ") + f(p, 2) + "%"; }
+  function spark(h, zly) {
+    var v = h.map(function (x) { return x[1]; });
+    var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), z = (mx - mn) || 1;
+    var p = v.map(function (y, i) {
+      return (i * (250 / (v.length - 1))).toFixed(1) + "," + (30 - (y - mn) / z * 28).toFixed(1);
+    }).join(" ");
+    var kolor = ((v[v.length - 1] >= v[0]) !== !!zly) ? "#2f9e44" : "#e03131";
+    return '<svg viewBox="0 0 250 32" width="100%" height="32" preserveAspectRatio="none">' +
+      '<polyline fill="none" stroke="' + kolor + '" stroke-width="2" points="' + p + '"/></svg>';
+  }
+  function wiersz(box, etyk, cena, hist, jedn, m, okres, krotki, zly, data) {
+    var w = el("div", "display:flex;justify-content:space-between;margin-top:4px");
+    w.appendChild(el("span", "", etyk));
+    w.appendChild(el("b", "", f(cena, m) + jedn));
+    box.appendChild(w);
+    if (hist && hist.length > 1) {
+      var s = el("div");
+      s.innerHTML = spark(hist, zly);
+      box.appendChild(s);
+      box.appendChild(el("div", "font-size:11px;color:#9aa3ad;margin-bottom:3px",
+        krotki + " " + okres + ": " + zm(proc(hist, krotki)) + " · " + (hist.length - 1) + " " + okres + ": " +
+        zm(proc(hist, hist.length - 1)) + (data ? " · " + data : "")));
+    }
+  }
+
+  // ---------- Sekcja: kursy, ropa, paliwa, zloto, WIG20 i zegary ----------
+  function czas(s) {
+    return new Intl.DateTimeFormat("pl-PL", { timeZone: s, hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
+  }
+  function kursyCzas() {
+    var box = el("div");
+    var zeg = [["Polska", "Europe/Warsaw"], ["UTC", "UTC"], ["Ormuz (UTC+4)", "Asia/Dubai"], ["Iran (UTC+3:30)", "Asia/Tehran"]];
+    var cz = el("div", "display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin-bottom:4px");
+    var wart = zeg.map(function (z) {
+      var w = el("div", "display:flex;justify-content:space-between");
+      w.appendChild(el("span", "", z[0]));
+      var b = el("b", "font-variant-numeric:tabular-nums", czas(z[1]));
+      w.appendChild(b);
+      cz.appendChild(w);
+      return b;
+    });
+    box.appendChild(cz);
+    var n = 0, t = setInterval(function () {
+      if (!cz.isConnected) { if (++n > 8) clearInterval(t); return; }
+      n = 0;
+      wart.forEach(function (b, i) { b.textContent = czas(zeg[i][1]); });
+    }, 1000);
+    var tr = el("div");
+    box.appendChild(tr);
+    return Promise.all([pobierz("rynek.json?t=" + Date.now()).catch(function () { return {}; }),
+      pobierz("rynek_plus.json?t=" + Date.now()).catch(function () { return {}; })]).then(function (r) {
+      var d = r[0], p = r[1];
+      [["brent", "Ropa Brent", " USD", 2], ["usd", "USD/PLN", " zł", 4], ["eur", "EUR/PLN", " zł", 4]].forEach(function (x) {
+        var o = d[x[0]];
+        if (o) wiersz(tr, x[1], o.kurs !== undefined ? o.kurs : o.cena, o.hist, x[2], x[3], "dni rob.", 5, false, o.data);
+      });
+      if (p.paliwa && p.paliwa.on) wiersz(tr, "ON (śr.)", p.paliwa.on.cena, p.paliwa.on.hist, " zł/l", 2, "tyg.", 4, true, p.paliwa.on.data);
+      if (p.paliwa && p.paliwa.pb95) wiersz(tr, "Pb95 (śr.)", p.paliwa.pb95.cena, p.paliwa.pb95.hist, " zł/l", 2, "tyg.", 4, true, p.paliwa.pb95.data);
+      if (p.zloto) wiersz(tr, "Złoto (1 g)", p.zloto.cena, p.zloto.hist, " zł", 2, "notowań", 5, false, p.zloto.data);
+      if (p.wig20) wiersz(tr, "WIG20", p.wig20.cena, p.wig20.hist, " pkt", 2, "notowań", 5, false, p.wig20.data);
+      tr.appendChild(el("div", "font-size:10px;color:#9aa3ad;margin-top:4px",
+        "Kursy: NBP (raz na dzień roboczy). Ropa: EIA / API Ninjas (opóźniona). Paliwa: fuel-prices.eu (CC BY 4.0), dane tygodniowe KE, " +
+        "przeliczone po kursie NBP. Złoto: NBP."));
+      return box;
+    });
+  }
+
   function trendy() {
     var M = [["g", "Statki – Zatoka Gdańska"], ["o", "Statki – Ormuz"], ["b", "Statki – Bab el-Mandeb"],
       ["s", "Samoloty nad Polską (starsza seria)"], ["a", "Alarmy lotnicze UA (liczba obszarów)"],
@@ -63,60 +147,34 @@
             if (w && w[1]) pkt.push([k, w[0] / w[1]]);
           });
           pkt = pkt.slice(-30);
-          var tyt = document.createElement("div");
-          tyt.style.cssText = "font-weight:bold;margin-top:8px";
-          tyt.textContent = m[1];
-          box.appendChild(tyt);
-          if (pkt.length < 2) {
-            var b = document.createElement("div");
-            b.style.cssText = "font-size:11px;color:#666";
-            b.textContent = "Za mało danych (dni: " + pkt.length + ").";
-            box.appendChild(b);
-            return;
-          }
+          box.appendChild(el("div", "font-weight:bold;margin-top:8px", m[1]));
+          if (pkt.length < 2) { box.appendChild(el("div", "font-size:11px;color:#9aa3ad", "Za mało danych (dni: " + pkt.length + ").")); return; }
           var v = pkt.map(function (p) { return p[1]; }), n = v.length;
           var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), z = (mx - mn) || 1;
           var pts = v.map(function (y, i) {
             return (10 + i * (240 / (n - 1))).toFixed(1) + "," + (40 - (y - mn) / z * 34).toFixed(1);
           }).join(" ");
-          var g = document.createElement("div");
+          var g = el("div");
           g.innerHTML = '<svg viewBox="0 0 260 46" width="100%" preserveAspectRatio="none"><polyline fill="none" stroke="' +
             (v[n - 1] >= v[0] ? "#2f9e44" : "#e03131") + '" stroke-width="2" points="' + pts + '"/></svg>';
           box.appendChild(g);
-          var o = document.createElement("div");
-          o.style.cssText = "font-size:11px;color:#555";
-          o.textContent = "Ostatni dzień: " + f1(v[n - 1]) + " · min " + f1(mn) + " · max " + f1(mx) +
-            " · " + pkt[0][0] + " do " + pkt[n - 1][0];
-          box.appendChild(o);
+          box.appendChild(el("div", "font-size:11px;color:#9aa3ad", "Ostatni dzień: " + f1(v[n - 1]) + " · min " + f1(mn) +
+            " · max " + f1(mx) + " · " + pkt[0][0] + " do " + pkt[n - 1][0]));
         });
-        var u = document.createElement("div");
-        u.style.cssText = "font-size:10px;color:#666;margin-top:6px";
-        u.textContent = "Średnia dzienna z próbek zapisywanych co ok. 3 godz. W Ormuzie i Bab el-Mandeb pozycje AIS mogą być fałszywe.";
-        box.appendChild(u);
+        box.appendChild(el("div", "font-size:10px;color:#9aa3ad;margin-top:6px",
+          "Średnia dzienna z próbek zapisywanych co ok. 3 godz. W Ormuzie i Bab el-Mandeb pozycje AIS mogą być fałszywe."));
         return box;
       })
-      .catch(function () {
-        var b = document.createElement("div");
-        b.textContent = "Brak danych trendów dziennych.";
-        return b;
-      });
+      .catch(function () { return el("div", "", "Brak danych trendów dziennych."); });
   }
 
   function zloz(s) {
     var box = document.createElement("div");
-    [["Blisko granicy Polski (24 h)", s.g], ["Statystyki obwodów", s.s], ["Trendy dzienne", s.t],
-     ["Oś czasu (ostatnie godziny)", s.o]].forEach(function (p, i) {
-      var h = document.createElement("div");
-      h.style.cssText = "font-weight:bold;font-size:14px;" + (i ? "margin-top:14px;border-top:2px solid rgba(0,0,0,0.2);padding-top:8px" : "");
-      h.textContent = p[0];
-      box.appendChild(h);
-      if (p[1]) box.appendChild(p[1]);
-      else {
-        var b = document.createElement("div");
-        b.style.cssText = "font-size:12px;color:#666;margin:4px 0";
-        b.textContent = "Brak danych.";
-        box.appendChild(b);
-      }
+    [["Kursy i czas", s.k], ["Blisko granicy Polski (24 h)", s.g], ["Statystyki obwodów", s.s],
+     ["Trendy dzienne", s.t], ["Oś czasu (ostatnie godziny)", s.o]].forEach(function (p, i) {
+      box.appendChild(el("div", "font-weight:bold;font-size:14px;" +
+        (i ? "margin-top:14px;border-top:2px solid rgba(255,255,255,0.18);padding-top:8px" : ""), p[0]));
+      box.appendChild(p[1] || el("div", "font-size:12px;color:#9aa3ad;margin:4px 0", "Brak danych."));
     });
     return box;
   }
@@ -130,7 +188,8 @@
     var fly = map.flyTo;
     map.flyTo = function () {};
     var s = {};
-    zbierz(document.getElementById("granica-odz"), /Blisko granicy/)
+    kursyCzas().catch(function () { return null; })
+      .then(function (w) { s.k = w; return zbierz(document.getElementById("granica-odz"), /Blisko granicy/); })
       .then(function (w) { s.g = w; return zbierz(ikona("📊"), /Statystyki/); })
       .then(function (w) { s.s = w; return trendy(); })
       .then(function (w) { s.t = w; return zbierz(ikona("🕐"), /Oś czasu/); })
@@ -148,7 +207,7 @@
   lewa.addEventListener("click", function (ev) {
     var t = ev.target;
     if (!t || !t.classList || !t.classList.contains("ikona-menu") || t.textContent.indexOf("📊") !== 0) return;
-    if (flaga) return;                       // wywolanie wewnetrzne: przepusc do oryginalnej obslugi
+    if (flaga) return;
     ev.stopPropagation();
     ev.preventDefault();
     var gp = document.getElementById("gora-panel");
