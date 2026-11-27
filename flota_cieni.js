@@ -1,11 +1,16 @@
 (function () {
   var TYP = "Flota Cieni";
+  var GODZ = 24;                       // ile godzin sladu pokazywac
   var tylkoCienie = false;
   var zapisaneFiltry = {};
-  var wszystkieTrasy = null;
-  var aktywnyZakresH = 72;
+  var wszystkieTrasy = undefined;
   var zarejestrowane = {};
   var aktPopup = null;
+
+  var czesci = location.pathname.split("/").filter(Boolean);
+  var BAZA = "https://raw.githubusercontent.com/" + location.hostname.split(".")[0] + "/" + (czesci[0] || "");
+  var URL_TRAS = ["flota_cieni_trasy.geojson", BAZA + "/dane/flota_cieni_trasy.geojson",
+    BAZA + "/dane_flota/flota_cieni_trasy.geojson"];
 
   var P = "body .cien-popup ";
   var st = document.createElement("style");
@@ -38,10 +43,6 @@
     P + ".cien-tabela td{padding:2px 0;vertical-align:top}" +
     P + ".cien-tabela td:first-child{color:#868e96!important;width:38%}" +
     P + ".cien-tabela td:last-child{color:#f1f3f5!important;font-weight:500}" +
-    P + ".cien-btns{display:flex;gap:6px;margin-bottom:8px}" +
-    P + ".cien-btns button{flex:1;background:#1f242d!important;color:#ced4da!important;border:1px solid #343a40!important;" +
-      "border-radius:6px!important;padding:5px 4px;font-size:11px;cursor:pointer}" +
-    P + ".cien-btns button.akt-zakres{background:#3b181c!important;color:#ff8787!important;border-color:#fa5252!important;font-weight:bold}" +
     P + ".cien-status{font-size:10px;color:#868e96!important;margin-bottom:6px}" +
     P + ".cien-sankcje{background:#1b2028;border:1px solid #2c323d;border-radius:6px;padding:6px 8px;font-size:11px;color:#ffd43b!important}" +
     "@media not all and (min-width:900px) and (hover:hover) and (pointer:fine){" +
@@ -63,15 +64,14 @@
     return !!f && f !== "false" && f !== "0" && f !== 0;
   }
   function warstwyStatkow() {
-    var st2 = map.getStyle();
-    return ((st2 && st2.layers) || []).filter(function (w) {
+    var s = map.getStyle();
+    return ((s && s.layers) || []).filter(function (w) {
       var id = w.id || "", src = w.source || "";
       return (String(src).indexOf("statk") >= 0 || id.indexOf("statk") >= 0) && (w.type === "circle" || w.type === "symbol");
     }).map(function (w) { return w.id; });
   }
   function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
 
-  // Zwykly dymek statku nie otwiera sie dla jednostek floty cieni (zamiast niego jest karta ponizej)
   var orygPopupStatku = window.pokazPopupStatku;
   window.pokazPopupStatku = function (p) {
     if (jestCien(p)) return;
@@ -91,10 +91,8 @@
   function zastosujFiltr() {
     warstwyStatkow().forEach(function (id) {
       if (!(id in zapisaneFiltry)) zapisaneFiltry[id] = map.getFilter(id) || null;
-      var orig = zapisaneFiltry[id];
-      var cond = ["==", ["get", "typ"], TYP];
-      if (tylkoCienie) map.setFilter(id, orig ? ["all", orig, cond] : cond);
-      else map.setFilter(id, orig);
+      var orig = zapisaneFiltry[id], cond = ["==", ["get", "typ"], TYP];
+      map.setFilter(id, tylkoCienie ? (orig ? ["all", orig, cond] : cond) : orig);
     });
   }
   btnCienie.addEventListener("click", function () {
@@ -104,48 +102,89 @@
     zastosujFiltr();
   });
 
-  // ---------- Slad wybranego statku ----------
+  // ---------- Slad (jak przy samolotach: linia przerywana, znika po zamknieciu dymka) ----------
   function dodajSlad() {
     if (map.getSource("cien-wybrany-slad")) return;
     map.addSource("cien-wybrany-slad", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     map.addLayer({ id: "warstwa-cien-wybrany-slad", type: "line", source: "cien-wybrany-slad",
-      paint: { "line-color": "#ffffff", "line-width": 2.8, "line-opacity": 0.95 } });
+      paint: { "line-color": "#fcc419", "line-width": 2.2, "line-opacity": 0.9, "line-dasharray": [2, 1.5] } });
   }
   function pobierzTrasy() {
-    if (wszystkieTrasy) return Promise.resolve(wszystkieTrasy);
-    return fetch("flota_cieni_trasy.geojson?t=" + Math.floor(Date.now() / 60000))
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { wszystkieTrasy = d; return d; })
-      .catch(function () { return null; });
+    if (wszystkieTrasy !== undefined) return Promise.resolve(wszystkieTrasy);
+    function proba(i) {
+      if (i >= URL_TRAS.length) { wszystkieTrasy = null; return null; }
+      return fetch(URL_TRAS[i] + (URL_TRAS[i].indexOf("?") < 0 ? "?t=" + Math.floor(Date.now() / 60000) : ""))
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (d) { wszystkieTrasy = d; return d; })
+        .catch(function () { return proba(i + 1); });
+    }
+    return Promise.resolve(proba(0));
   }
-  function rysujSladStatku(mmsi, godziny, statusEl) {
+  function czas(v) {
+    if (v === undefined || v === null || v === "") return null;
+    if (typeof v === "number") return v > 1e12 ? v : (v > 1e9 ? v * 1000 : null);
+    var s = String(v).trim();
+    if (/^\d+(\.\d+)?$/.test(s)) return czas(+s);
+    var t = Date.parse(s.replace(" ", "T"));
+    return isNaN(t) ? null : t;
+  }
+  function znajdz(dane, mmsi, imo) {
+    var lista = dane.features || (Array.isArray(dane) ? dane : null);
+    if (lista) {
+      return lista.filter(function (f) {
+        var p = (f && f.properties) || f || {};
+        return String(p.mmsi || p.MMSI || p.id || "") === mmsi || (imo && String(p.imo || p.IMO || "") === imo);
+      })[0] || null;
+    }
+    return dane[mmsi] ? { properties: { punkty: dane[mmsi] } } : null;
+  }
+  function punkty(ft) {
+    var p = ft.properties || ft, out = [];
+    var pk = p.punkty || p.points || p.track || p.trasa || p.historia || p.positions;
+    if (typeof pk === "string") { try { pk = JSON.parse(pk); } catch (e) { pk = null; } }
+    if (Array.isArray(pk)) {
+      pk.forEach(function (pt) {
+        var lon, lat, t;
+        if (Array.isArray(pt)) { lon = +pt[0]; lat = +pt[1]; t = czas(pt[2]); }
+        else if (pt && typeof pt === "object") {
+          lon = +(pt.lon !== undefined ? pt.lon : (pt.lng !== undefined ? pt.lng : pt.x));
+          lat = +(pt.lat !== undefined ? pt.lat : pt.y);
+          t = czas(pt.ts !== undefined ? pt.ts : (pt.t !== undefined ? pt.t : (pt.time !== undefined ? pt.time : pt.czas)));
+        }
+        if (isFinite(lon) && isFinite(lat)) out.push({ lon: lon, lat: lat, t: t });
+      });
+    }
+    var g = ft.geometry;
+    if (!out.length && g && (g.type === "LineString" || g.type === "MultiLineString")) {
+      var c = g.type === "MultiLineString" ? [].concat.apply([], g.coordinates) : g.coordinates;
+      c.forEach(function (q) { out.push({ lon: +q[0], lat: +q[1], t: czas(q[2]) }); });
+    }
+    return out;
+  }
+  function pustySlad() {
+    var s = map.getSource("cien-wybrany-slad");
+    if (s) s.setData({ type: "FeatureCollection", features: [] });
+  }
+  function rysujSlad(mmsi, imo, statusEl) {
     var src = map.getSource("cien-wybrany-slad");
     if (!src) return;
-    if (!mmsi) { src.setData({ type: "FeatureCollection", features: [] }); return; }
     pobierzTrasy().then(function (dane) {
-      if (!dane || !dane.features) {
-        if (statusEl) statusEl.textContent = "Brak zapisanej historii trasy (zbieranie co 10 min).";
-        return;
-      }
-      var ft = dane.features.find(function (f) { return f.properties && String(f.properties.mmsi) === String(mmsi); });
-      if (!ft || !ft.properties || !ft.properties.punkty) {
-        src.setData({ type: "FeatureCollection", features: [] });
-        if (statusEl) statusEl.textContent = "Zebrano dopiero 1 punkt pozycji – linia pojawi się po kolejnym cyklu.";
-        return;
-      }
-      var prog = Date.now() - godziny * 3600 * 1000, coords = [];
-      ft.properties.punkty.forEach(function (pt) {
-        var ts = Date.parse(pt[2]);
-        if (!isNaN(ts) && ts >= prog) coords.push([pt[0], pt[1]]);
-      });
-      if (coords.length >= 2) {
-        src.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: {},
-          geometry: { type: "LineString", coordinates: coords } }] });
-        if (statusEl) statusEl.textContent = "Punktów na śladzie (" + godziny + "h): " + coords.length;
-      } else {
-        src.setData({ type: "FeatureCollection", features: [] });
-        if (statusEl) statusEl.textContent = "Za mało punktów w ostatnich " + godziny + "h.";
-      }
+      if (aktPopup === null) return;
+      if (!dane) { statusEl.textContent = "Nie znaleziono pliku tras (flota_cieni_trasy.geojson)."; return; }
+      var ft = znajdz(dane, mmsi, imo);
+      var ile = (dane.features || (Array.isArray(dane) ? dane : Object.keys(dane))).length;
+      if (!ft) { statusEl.textContent = "Brak tego statku w pliku tras (statków w pliku: " + ile + ")."; pustySlad(); return; }
+      var pkt = punkty(ft);
+      if (pkt.every(function (x) { return x.t !== null; })) pkt.sort(function (a, b) { return a.t - b.t; });
+      var prog = Date.now() - GODZ * 3600 * 1000;
+      var mamyCzas = pkt.some(function (x) { return x.t !== null; });
+      var okno = mamyCzas ? pkt.filter(function (x) { return x.t !== null && x.t >= prog; }) : pkt;
+      var uwaga = "";
+      if (mamyCzas && okno.length < 2 && pkt.length >= 2) { okno = pkt; uwaga = " (starsze niż " + GODZ + " h)"; }
+      if (okno.length < 2) { statusEl.textContent = "Za mało punktów śladu (" + okno.length + ")."; pustySlad(); return; }
+      src.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: {},
+        geometry: { type: "LineString", coordinates: okno.map(function (x) { return [x.lon, x.lat]; }) } }] });
+      statusEl.textContent = "Ślad: " + okno.length + " punktów" + (mamyCzas ? " z ostatnich " + GODZ + " h" : "") + uwaga + ".";
     });
   }
 
@@ -178,8 +217,8 @@
         "&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url|mime&iiurlwidth=640&gsrsearch=" + encodeURIComponent(zap[i]))
         .then(function (r) { return r.json(); })
         .then(function (d) {
-          var st3 = (d.query && d.query.pages) || {};
-          var tr = Object.keys(st3).map(function (k) { return st3[k]; }).sort(function (a, b) {
+          var s3 = (d.query && d.query.pages) || {};
+          var tr = Object.keys(s3).map(function (k) { return s3[k]; }).sort(function (a, b) {
             return (a.index || 99) - (b.index || 99);
           }).filter(function (s) {
             var ii = s.imageinfo && s.imageinfo[0];
@@ -234,26 +273,10 @@
     });
     box.appendChild(tab);
 
-    var btns = document.createElement("div");
-    btns.className = "cien-btns";
-    var b24 = document.createElement("button"), b72 = document.createElement("button");
-    b24.textContent = "Ślad 24 h";
-    b72.textContent = "Ślad 72 h";
-    (aktywnyZakresH === 24 ? b24 : b72).className = "akt-zakres";
-    btns.appendChild(b24); btns.appendChild(b72);
-    box.appendChild(btns);
-
-    var statusSladu = document.createElement("div");
-    statusSladu.className = "cien-status";
-    box.appendChild(statusSladu);
-    function zakres(h) {
-      aktywnyZakresH = h;
-      b24.className = h === 24 ? "akt-zakres" : "";
-      b72.className = h === 72 ? "akt-zakres" : "";
-      rysujSladStatku(mmsi, h, statusSladu);
-    }
-    b24.addEventListener("click", function () { zakres(24); });
-    b72.addEventListener("click", function () { zakres(72); });
+    var status = document.createElement("div");
+    status.className = "cien-status";
+    status.textContent = "Ładowanie śladu…";
+    box.appendChild(status);
 
     var sank = document.createElement("div");
     sank.className = "cien-sankcje";
@@ -265,9 +288,9 @@
     aktPopup = popup;
     popup.on("close", function () {
       if (aktPopup === popup) aktPopup = null;
-      rysujSladStatku(null);
+      pustySlad();
     });
-    rysujSladStatku(mmsi, aktywnyZakresH, statusSladu);
+    rysujSlad(mmsi, imo, status);
   }
 
   // ---------- Klikniecia (rejestrowane tylko raz na warstwe) ----------
