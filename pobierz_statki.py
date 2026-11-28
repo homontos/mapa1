@@ -139,8 +139,6 @@ def wczytaj_stare():
         p["lat"] = next(it)
         statki[str(p["mmsi"])] = p
     return statki
-
-
 def _ais_6bit_str(bits):
     out = []
     for i in range(0, len(bits) - 5, 6):
@@ -151,7 +149,7 @@ def _ais_6bit_str(bits):
 
 def _s_int(bits):
     v = int(bits, 2)
-    return v - (1 << len(bits)) if bits == "1" else v
+    return v - (1 << len(bits)) if bits.startswith("1") else v
 
 
 def pobierz_dma_dania(statki, sekundy=20):
@@ -179,15 +177,19 @@ def pobierz_dma_dania(statki, sekundy=20):
                 idx = line.find("!AIVDM")
                 if idx == -1:
                     continue
-                parts = line[idx:].split("*").split(",")
+                czesc_glowna = next(iter(line[idx:].split("*")))
+                parts = czesc_glowna.split(",")
                 if len(parts) < 6:
                     continue
                 try:
-                    total = int(parts)
-                    num = int(parts)
-                    seq = parts
-                    payload = parts
-                except ValueError:
+                    it_p = iter(parts)
+                    next(it_p)  # !AIVDM
+                    total = int(next(it_p))
+                    num = int(next(it_p))
+                    seq = next(it_p)
+                    next(it_p)  # kanal A/B
+                    payload = next(it_p)
+                except (ValueError, StopIteration):
                     continue
 
                 if total > 1:
@@ -252,6 +254,8 @@ def pobierz_dma_dania(statki, sekundy=20):
                         s["cel"] = cel
 
     print(f"DMA (Dania / Bornholm): zaktualizowano {len(zaktualizowane)} statkow.")
+
+
 def pobierz_json_url(url):
     req = urllib.request.Request(url, headers={
         "Accept": "application/json",
@@ -320,8 +324,6 @@ def pobierz_digitraffic_caly_baltyk(statki):
         dodane += 1
 
     print(f"Digitraffic: pobrano {dodane} statkow.")
-
-
 async def nasluchuj_aisstream(statki):
     if not KLUCZ:
         return
@@ -333,7 +335,7 @@ async def nasluchuj_aisstream(statki):
             print(f"AISStream: proba {proba}/2 (nasluch {CZAS_NASLUCHU}s)...")
             async with websockets.connect(
                 ws_url,
-                open_timeout=25,
+                open_timeout=60,
                 close_timeout=10
             ) as ws:
                 await ws.send(json.dumps({
@@ -461,7 +463,7 @@ def aktualizuj_historie_tras(statki):
                 coords.append([next(it), next(it)])
             props = dict(data["props"])
             props["punkty"] = swieze
-            geom = {"type": "LineString", "coordinates": coords} if len(coords) >= 2 else {"type": "Point", "coordinates": coords[0]}
+            geom = {"type": "LineString", "coordinates": coords} if len(coords) >= 2 else {"type": "Point", "coordinates": next(iter(coords))}
             features_tras.append({
                 "type": "Feature",
                 "properties": props,
@@ -474,6 +476,52 @@ def aktualizuj_historie_tras(statki):
     print(f"Zapisano slady tras: {ile_linii} linii (lacznie sledzonych jednostek: {len(features_tras)}).")
 
 
+def zapisz(statki, sankcje):
+    teraz = datetime.now(timezone.utc)
+    features = []
+    ile_floty_cieni = 0
+
+    for mmsi, s in statki.items():
+        lat = s.get("lat")
+        lon = s.get("lon")
+        if lat is None or lon is None:
+            continue
+
+        akt = s.get("aktualizacja")
+        if akt:
+            try:
+                t_akt = datetime.fromisoformat(akt)
+                if t_akt.tzinfo is None:
+                    t_akt = t_akt.replace(tzinfo=timezone.utc)
+                if teraz - t_akt > MAX_WIEK:
+                    continue
+            except Exception:
+                pass
+
+        if oznacz_flote_cieni(s, sankcje):
+            ile_floty_cieni += 1
+
+        props = {k: v for k, v in s.items() if k not in ("lat", "lon")}
+        features.append({
+            "type": "Feature",
+            "properties": props,
+            "geometry": {
+                "type": "Point",
+                "coordinates": [round(float(lon), 5), round(float(lat), 5)]
+            }
+        })
+
+    geojson = {
+        "type": "FeatureCollection",
+        "generated_at": teraz.isoformat(timespec="seconds"),
+        "features": features
+    }
+
+    with open(PLIK, "w", encoding="utf-8") as f:
+        json.dump(geojson, f, ensure_ascii=False)
+
+    print(f"Zapisano {len(features)} statkow do {PLIK} (w tym Flota Cieni: {ile_floty_cieni}).")
+
     if czy_baltyk():
         aktualizuj_historie_tras(statki)
 
@@ -482,11 +530,15 @@ statki = wczytaj_stare()
 sankcje = pobierz_lista_floty_cieni()
 
 if czy_baltyk():
-           
     try:
         pobierz_digitraffic_caly_baltyk(statki)
     except Exception as e:
         print("Blad Digitraffic:", e)
+
+    try:
+        pobierz_dma_dania(statki, sekundy=20)
+    except Exception as e:
+        print("Blad DMA Dania:", e)
 
 try:
     asyncio.run(nasluchuj_aisstream(statki))
